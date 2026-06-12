@@ -1,0 +1,6 @@
+{
+  "name": "EcoTwin",
+  "description": "An AI-powered carbon footprint companion to track, visualize, and reduce emissions with an interactive virtual pet, smart receipt/bill scanner, and AI coaching.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

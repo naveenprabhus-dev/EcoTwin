@@ -265,7 +265,7 @@ export default function Scanner({ userId, onRefreshProfile }: ScannerProps) {
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-[#F9FAF8] border border-art-border p-3 rounded-xl text-center">
                         <span className="text-[10px] text-art-olive block uppercase tracking-wider font-bold">Total cost</span>
-                        <span className="text-sm font-bold text-art-dark font-mono">${scannedResult.cost}</span>
+                        <span className="text-sm font-bold text-art-dark font-mono">₹{scannedResult.cost}</span>
                       </div>
                       <div className="bg-[#F9FAF8] border border-art-border p-3 rounded-xl text-center">
                         <span className="text-[10px] text-art-olive block uppercase tracking-wider font-bold">Power units</span>

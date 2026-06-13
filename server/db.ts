@@ -8,7 +8,7 @@ const DB_FILE = path.join(process.cwd(), 'db.json');
 export const DEFAULT_ONBOARDING: OnboardingData = {
   transType: 'public',
   transDistWeekly: 50,
-  monthlyElectricBill: 80,
+  monthlyElectricBill: 3500,
   acUsage: 'medium',
   diet: 'vegetarian',
   shopFreq: 'weekly',
@@ -53,7 +53,7 @@ export function calculateCarbonStats(data: OnboardingData): CarbonStats {
   const transportMonthly = Math.round(data.transDistWeekly * 4.3 * transFactor);
 
   // 2. Electricity & AC
-  const kwhRate = 5; // kWh per $1
+  const kwhRate = 0.114; // kWh per ₹1 (typical India utility average)
   const kgCo2PerKwh = 0.4;
   const electricityMonthly = Math.round(data.monthlyElectricBill * kwhRate * kgCo2PerKwh);
   

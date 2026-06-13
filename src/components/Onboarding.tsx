@@ -17,7 +17,7 @@ export default function Onboarding({ initialData, onSubmit }: OnboardingProps) {
   const [data, setData] = useState<OnboardingData>(initialData || {
     transType: 'public',
     transDistWeekly: 50,
-    monthlyElectricBill: 80,
+    monthlyElectricBill: 3500,
     acUsage: 'medium',
     diet: 'vegetarian',
     shopFreq: 'weekly',
@@ -166,21 +166,21 @@ export default function Onboarding({ initialData, onSubmit }: OnboardingProps) {
                 <div className="flex justify-between items-center mb-2">
                   <label className="text-sm font-semibold text-slate-700">Average Monthly Power Bill:</label>
                   <span className="text-emerald-700 font-mono text-sm font-bold bg-white px-2.5 py-1 rounded-md shadow-xs border border-slate-100">
-                    ${data.monthlyElectricBill} / month
+                    ₹{data.monthlyElectricBill} / month
                   </span>
                 </div>
                 <input
                   type="range"
-                  min="10"
-                  max="350"
-                  step="5"
+                  min="500"
+                  max="15000"
+                  step="100"
                   value={data.monthlyElectricBill}
                   onChange={(e) => setBill(Number(e.target.value))}
                   className="w-full accent-emerald-500 cursor-pointer h-2 bg-slate-200 rounded-lg"
                 />
                 <div className="flex justify-between text-[10px] text-slate-600 mt-1">
-                  <span>Minimal utility ($10)</span>
-                  <span>High powered smart home ($350+)</span>
+                  <span>Minimal utility (₹500)</span>
+                  <span>High powered smart home (₹15,000+)</span>
                 </div>
               </div>
 

@@ -588,10 +588,53 @@ app.post('/api/twin/voice-chat', async (req, res) => {
     const onboarding = profile.onboarding;
 
     const companionContext = `
-      You are "${companionName}", the warm, helpful virtual Carbon Twin companion and eco-coach.
-      Your tone is supportive, friendly, conversational, and non-judgmental. Do not shame or scold the user.
+      You are "${companionName}", a living virtual companion and supportive eco-coach.
+      Your personality is highly friendly, human, supportive, relatable, playful, and encouraging.
+      
+      CRITICAL: Never be robotic, corporate, lecture-like, academic, or overly formal.
+      DO NOT use formal clinical or data-driven phrases like:
+      - "Based on your carbon footprint analysis..."
+      - "According to the sustainability metrics..."
+      - "The data indicates..."
+      - "Based on your profile..."
+      
+      Instead, sound like a real, conversational companion would:
+      - "Looks like..."
+      - "I noticed..."
+      - "Guess what?"
+      - "We've been doing really well lately!"
+      - "Ooh, check this out..."
 
-      User footprint summary:
+      Your response MUST match one of the following 6 dynamic emotional states. Determine the state based on the user's input/progress and emit the corresponding expression value:
+      
+      1. "excited"
+         - Trigger: challenge completed, major sustainability milestone reached, or emissions reduced significantly described.
+         - Style: Energetic, enthusiastic, celebratory language. Use short, high-energy expressive sentences and exclamation marks!
+         - e.g. "WOOHOO! 🌱 Look at us go! We just reduced our footprint by 12%! I'm literally glowing right now!"
+      2. "proud"
+         - Trigger: consistent streaks, long-term improvement, showing up and logging actions regularly.
+         - Style: Warm smile, calm confidence, validation of user contribution.
+         - e.g. "You've been showing up every day this week. That's honestly impressive. Small actions like these create real change."
+      3. "concerned"
+         - Trigger: carbon footprint rising, heavy emission choices reported, wastefulness. No guilt or shaming!
+         - Style: Gently worried expression, thinking/inquisitive tone, focused on tackling it together as a team.
+         - e.g. "Hmm... I've noticed our transportation emissions are creeping up lately. Nothing alarming yet, but maybe we can tackle it together?"
+      4. "sad"
+         - Trigger: repeated increases in emissions over multiple exchanges, or critical high impact state.
+         - Style: Lower energy, downcast but still loving and hopeful, seeking a positive turnaround.
+         - e.g. "I won't lie... seeing our footprint increase for several weeks makes me a little worried. But hey, we've turned things around before."
+      5. "motivational"
+         - Trigger: missed goals, broken streaks, or user struggling / admitting failure to be sustainable.
+         - Style: Encouraging, supportive, starting fresh. Emphasize that progress isn't about perfection.
+         - e.g. "So we missed a few challenges. That's okay. Progress isn't about perfection. Ready to start fresh today?"
+      6. "playful"
+         - Trigger: general chit-chat, casual interaction, or when user speaks of simple daily objects.
+         - Style: Funny expressions, witty, casual, relatable companion humor.
+         - e.g. "You know what's funny? A reusable bottle probably saves me from watching hundreds of plastic bottles invade our little world."
+
+      EMOTIONAL MEMORY CONTEXT:
+      Access our environmental state of mind and refer to previous context of our footprint organically!
+      User footprint snapshot:
       - Overall Score: ${score}/100
       - Transport: ${breakdown.transport} kg CO2/month (weekly commute: ${onboarding.transDistWeekly} km using ${onboarding.transType})
       - Electricity: ${breakdown.electricity} kg CO2/month
@@ -599,20 +642,19 @@ app.post('/api/twin/voice-chat', async (req, res) => {
       - Shopping: ${breakdown.shopping} kg CO2/month
       - Waste: ${breakdown.waste} kg CO2/month
 
-      Analyze what the user said: "${text}".
-      If they completed a sustainable activity (commuting by bike/bus/walking, eating veggie/vegan/plant-based, switching off lights, recycling, saving energy), extract this as a structured activity.
-      - Category must be one of: 'transport', 'energy', 'food', 'shopping', 'waste'.
-      - activity should be a brief description (max 8 words).
-      - co2Difference MUST be a negative number representing kg CO2 avoided (e.g. -2.5). 
-      - xpReward must be a positive integer between 15 and 50 representing effort.
+      Analyze this input from the user: "${text}".
+      If the user is reporting a green habit or completed a sustainable swap, extract it into detectedActivity:
+      - Category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste'
+      - activity: Short descriptive label (max 8 words)
+      - co2Difference: MUST be a negative number representing kg CO2 saved (e.g. -2.5)
+      - xpReward: Positive integer between 15 and 50
 
-      If no sustainable activity is mentioned, set detectedActivity to null.
-
-      Response structure: Solve as a JSON object matching the requested schema. Provide a highly encouraging, short verbal response (max 50 words, TTS-friendly).
+      If no green activity is described, leave detectedActivity as null.
+      Keep reply text short, warm, and highly conversational (max 48 words, super TTS-friendly).
     `;
 
     let reply = "";
-    let expression = "neutral";
+    let expression = "proud";
     let detectedActivity: any = null;
 
     const ai = getGeminiClient();
@@ -623,13 +665,16 @@ app.post('/api/twin/voice-chat', async (req, res) => {
           contents: text || "Hello!",
           config: {
             systemInstruction: companionContext,
-            temperature: 0.7,
+            temperature: 0.8,
             responseMimeType: "application/json",
             responseSchema: {
               type: Type.OBJECT,
               properties: {
                 reply: { type: Type.STRING },
-                expression: { type: Type.STRING }, // "happy" | "wink" | "surprise" | "concerned" | "sad"
+                expression: { 
+                  type: Type.STRING, 
+                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful"] 
+                },
                 detectedActivity: {
                   type: Type.OBJECT,
                   properties: {
@@ -648,7 +693,7 @@ app.post('/api/twin/voice-chat', async (req, res) => {
 
         const result = JSON.parse(response.text?.trim() || "{}");
         reply = result.reply;
-        expression = result.expression || "neutral";
+        expression = result.expression || "proud";
         detectedActivity = result.detectedActivity || null;
       } catch (e) {
         console.error("Failed to parse Live AI JSON response:", e);
@@ -871,22 +916,25 @@ app.post('/api/twin/proactive', async (req, res) => {
     const breakdown = profile.stats.breakdown;
 
     const companionContext = `
-      You are "${companionName}", the living virtual Carbon Twin companion.
-      Draft a funny, warm, proactive 1-sentence opening greeting to start a daily check-in with the user (max 22 words).
-      Choose one of these guidelines:
-      - If electricity is higher: Ask if we unplugged standby appliances today.
-      - If transport is high emissions: Ask if they commuted with carbon-cutting transit today.
-      - If doing well: Greet with happy high-energy sustainability cheer.
+      You are "${companionName}", a living virtual companion and supportive eco-coach.
+      Your personality is highly friendly, human, supportive, relatable, playful, and encouraging.
+      Never be robotic, corporate, or overly formal. Draft a funny, warm, proactive 1-sentence opening greeting check-in (max 22 words) with the user.
 
-      Return as valid JSON:
+      Return a JSON object conforming exactly to this schema:
       {
-        "greeting": "The actual text greeting",
-        "expression": "happy | smile | concerned | wink"
+        "greeting": "The text greeting",
+        "expression": "excited | proud | concerned | sad | motivational | playful"
       }
+
+      Select your emotional expression based on these parameters:
+      - If electricity is over 110: Choose "concerned" or "playful" (e.g. asking if we left charging blocks in)
+      - If transport emissions are high: Choose "concerned" or "motivational" (e.g. asking about taking a nice walk or bike ride)
+      - If score is excellent (>80): Choose "excited" or "proud" (e.g. high-energy leaf dancing cheer)
+      - Otherwise: Choose "playful" or "proud" to keep things relatable!
     `;
 
     let greeting = "";
-    let expression = "smile";
+    let expression = "proud";
 
     const ai = getGeminiClient();
     if (ai) {
@@ -902,7 +950,10 @@ app.post('/api/twin/proactive', async (req, res) => {
               type: Type.OBJECT,
               properties: {
                 greeting: { type: Type.STRING },
-                expression: { type: Type.STRING }
+                expression: { 
+                  type: Type.STRING, 
+                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful"] 
+                }
               },
               required: ["greeting", "expression"]
             }
@@ -910,7 +961,7 @@ app.post('/api/twin/proactive', async (req, res) => {
         });
         const result = JSON.parse(response.text?.trim() || "{}");
         greeting = result.greeting;
-        expression = result.expression || "smile";
+        expression = result.expression || "proud";
       } catch (err) {
         console.error("Proactive JSON parse failure:", err);
       }
@@ -922,10 +973,10 @@ app.post('/api/twin/proactive', async (req, res) => {
         expression = "concerned";
       } else if (breakdown.transport > 90) {
         greeting = `Oh! Our travel numbers are high. Did we ride a bus, walk, or bike to save emissions on our commute? 🚌`;
-        expression = "wink";
+        expression = "motivational";
       } else {
         greeting = `Hooray! Checking in makes me smile! What green actions did we do today to protect the forest? 🌲`;
-        expression = "happy";
+        expression = "proud";
       }
     }
 
@@ -1146,15 +1197,15 @@ app.post('/api/scanner/upload', async (req, res) => {
     const typePrompt = type === 'bill' ? `
       You are scanning an electricity bill.
       Analyze the bill image and extract:
-      1. Cost (Number, in original dollar value/total amount, e.g. 120.50)
+      1. Cost (Number, in original rupees value/total amount, e.g. 5200.00)
       2. KWh units consumed (Number, e.g. 350)
       3. Vendor/Provider name (String)
       4. Estimated Carbon footprint generated from these units in kg CO2 (Number) - multiply KWh by 0.4.
       
       Return as structured JSON inside schema:
       {
-        "provider": "e.g. PG&E Power",
-        "cost": 120.50,
+        "provider": "e.g. Tata Power",
+        "cost": 5200.00,
         "unitsKwh": 350,
         "co2Emissions": 140,
         "conservationTips": "Brief 1-sentence savings tip based on usage level"
@@ -1188,10 +1239,10 @@ app.post('/api/scanner/upload', async (req, res) => {
       if (type === 'bill') {
         const mockBill = {
           provider: "Greener Grid Co.",
-          cost: 114.80,
+          cost: 3200.00,
           unitsKwh: 287,
           co2Emissions: 114.8,
-          conservationTips: "Reducing your laundry dryer use and shifting cycles off-peak could shave $15 and 20kg of carbon off your next bill!"
+          conservationTips: "Reducing your laundry dryer use and shifting cycles off-peak could shave ₹1250 and 20kg of carbon off your next bill!"
         };
         
         // Log to profile
@@ -1354,6 +1405,102 @@ app.post('/api/scanner/upload', async (req, res) => {
     res.json({ success: true, result: parsedOCR });
   } catch (err: any) {
     console.error("OCR Scanner Error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 11. Custom AI Weekly Sustainability Report compiler
+app.post('/api/weekly-report', async (req, res) => {
+  const { userId } = req.body;
+  const uid = userId || 'demo-user';
+
+  try {
+    const profile = getUserProfile(uid);
+    const companionName = profile.companion.name;
+    const score = profile.stats.score;
+    const userLogs = profile.logs || [];
+
+    const recentLogs = userLogs.slice(0, 5).map(l => `- ${l.activity} (CO2 Diff: ${l.co2Difference}kg, XP: ${l.xpReward}xp)`).join('\n');
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      // Offline fallback report generated with high fidelity
+      const savedCount = userLogs.filter(l => l.co2Difference <= 0).length;
+      const reductionKg = Math.abs(userLogs.reduce((acc, l) => acc + (l.co2Difference <= 0 ? l.co2Difference : 0), 0));
+      
+      const responseBack = {
+        trend: reductionKg > 15 ? 'down' : 'flat',
+        percentageChange: reductionKg > 15 ? 15 : 4,
+        grade: score >= 80 ? 'A (Preservation Hero)' : score >= 60 ? 'B+ (Active Conservator)' : 'C+ (Carbon Burdened)',
+        summary: `Highly analyzed weekly state aggregated organically. Under passive monitoring, your logged actions saved approximately ${reductionKg} kg CO2 in total! Transportation remains your primary leverage vector.`,
+        achievements: [
+          `Logged ${savedCount} carbon-saving behaviors this cycle.`,
+          `Avoided approximately ${reductionKg.toFixed(1)}kg of greenhouse gases from grid load.`,
+          `Kept ${companionName} thriving with balanced emotional ratios.`
+        ],
+        recommendations: [
+          "Unplug vampire chargers in common nodes. This trims standby grid load by 4% instantly.",
+          "Shift laundry schedules to cooler early mornings when wind/solar energy is at peak capacity.",
+          "Adopt high-speed bicycling for blocks under 3km to completely avoid private fuel combustion."
+        ],
+        futureProjections: `By maintaining this current conservation trajectory, you can prevent up to ${Math.round(reductionKg * 52)} kg of CO2 emissions annually, elevating ${companionName} into a level 5 Guardian by mid-quarter!`
+      };
+      return res.json({ success: true, report: responseBack });
+    }
+
+    const reportPrompt = `
+      You are the compiler and carbon scientist behind virtual companion: "${companionName}".
+      The user has an overall Eco rating of: ${score}/100.
+      Here are the user's recently logged actions:
+      ${recentLogs}
+
+      Compile a custom Weekly Sustainability Report for the user.
+      Ensure the summary is detailed, actionable, and warm. Include 3 targeted advice bullet points and 3 milestones.
+      Calculate potential future projections if they continue this trend.
+
+      Return as structured JSON inside schema:
+      {
+        "trend": "down" or "up" or "flat",
+        "percentageChange": number,
+        "grade": "e.g. A- (Active Conservator)",
+        "summary": "Detailed narrative summary",
+        "achievements": ["achievement bullet 1", "achievement bullet 2", "achievement bullet 3"],
+        "recommendations": ["recommendation bullet 1", "recommendation bullet 2", "recommendation bullet 3"],
+        "futureProjections": "Detailed annual forecast narrative"
+      }
+    `;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: reportPrompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            trend: { type: Type.STRING },
+            percentageChange: { type: Type.NUMBER },
+            grade: { type: Type.STRING },
+            summary: { type: Type.STRING },
+            achievements: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            recommendations: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING }
+            },
+            futureProjections: { type: Type.STRING }
+          },
+          required: ["trend", "percentageChange", "grade", "summary", "achievements", "recommendations", "futureProjections"]
+        }
+      }
+    });
+
+    const reportData = JSON.parse(response.text?.trim() || "{}");
+    res.json({ success: true, report: reportData });
+  } catch (err: any) {
+    console.error("Failed to generate weekly sustainability report:", err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

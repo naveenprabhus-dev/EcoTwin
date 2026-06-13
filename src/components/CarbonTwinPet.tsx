@@ -8,30 +8,33 @@ interface CarbonTwinPetProps {
   name: string;
   moodState?: 'feed' | 'dance' | 'idle' | 'petted';
   isSpeaking?: boolean;
+  currentMood?: 'excited' | 'proud' | 'concerned' | 'sad' | 'motivational' | 'playful';
 }
 
-export default function CarbonTwinPet({ score, equippedAccessories, name, moodState = 'idle', isSpeaking = false }: CarbonTwinPetProps) {
+export default function CarbonTwinPet({ score, equippedAccessories, name, moodState = 'idle', isSpeaking = false, currentMood }: CarbonTwinPetProps) {
   // Interactivity and reaction states
   const [activeReaction, setActiveReaction] = useState<string | null>(null);
   const [bubbleText, setBubbleText] = useState<string | null>(null);
   const [particles, setParticles] = useState<{ id: number; char: string; x: number; y: number }[]>([]);
   const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
 
-  // Determine state grouping
-  // Excellent: 80 - 100
-  // Good: 60 - 79
-  // Moderate: 40 - 59
-  // High Impact: 20 - 39
-  // Critical: 0 - 19
+  // Derive stateGroup as fallback
+  let defaultStateGroup: 'excellent' | 'good' | 'moderate' | 'high' | 'critical' = 'good';
+  if (score >= 80) defaultStateGroup = 'excellent';
+  else if (score >= 60) defaultStateGroup = 'good';
+  else if (score >= 40) defaultStateGroup = 'moderate';
+  else if (score >= 20) defaultStateGroup = 'high';
+  else defaultStateGroup = 'critical';
+
+  // Determine standard companion mood if not specified
+  const effectiveMood = currentMood || (
+    score >= 80 ? 'excited' :
+    score >= 63 ? 'proud' :
+    score >= 48 ? 'playful' :
+    score >= 28 ? 'concerned' : 'sad'
+  );
 
   let stateGroup: 'excellent' | 'good' | 'moderate' | 'high' | 'critical' = 'good';
-  if (score >= 80) stateGroup = 'excellent';
-  else if (score >= 60) stateGroup = 'good';
-  else if (score >= 40) stateGroup = 'moderate';
-  else if (score >= 20) stateGroup = 'high';
-  else stateGroup = 'critical';
-
-  // Determine skin color, mood text, and environmental colors
   let bodyColor = '';
   let cheekColor = '';
   let moodText = '';
@@ -39,46 +42,60 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
   let bgGradient = '';
   let faceAccent = '';
 
-  switch (stateGroup) {
-    case 'excellent':
+  switch (effectiveMood) {
+    case 'excited':
+      stateGroup = 'excellent';
       bodyColor = '#22c55e'; // Vibrant Green
       cheekColor = '#f43f5e'; // Pastel pink cheeks
-      moodText = 'Radiant & Thriving!';
-      description = `Your eco-footprint is incredibly low! ${name} is blooming with high-energy vitality, surrounded by fresh oxygen and lush vegetation.`;
-      bgGradient = 'from-emerald-50 via-green-100 to-emerald-200';
+      moodText = 'Radiant & Excited!';
+      description = `Your eco-actions are amazing! ${name} is blooming with high-energy excitement, surrounded by fresh oxygen!`;
+      bgGradient = 'from-emerald-300 via-green-100 to-emerald-400';
       faceAccent = '#15803d';
       break;
-    case 'good':
+    case 'proud':
+      stateGroup = 'good';
       bodyColor = '#10b981'; // Fresh Teal/Green
       cheekColor = '#fda4af'; // Light pink
-      moodText = 'Feeling Great & Healthy!';
-      description = `Your sustainable actions are keeping the surrounding environment clean and tidy. ${name} is feeling secure and calm.`;
-      bgGradient = 'from-green-50 via-teal-50 to-emerald-100';
+      moodText = 'Thriving & Proud!';
+      description = `You've been showing up and keeping our footprint low. ${name} is feeling secure and proud!`;
+      bgGradient = 'from-green-100 via-teal-50 to-emerald-200';
       faceAccent = '#115e59';
       break;
-    case 'moderate':
-      bodyColor = '#f59e0b'; // Warm Amber
-      cheekColor = '#fef08a'; // Faint yellow cheek tint
-      moodText = 'Slightly Concerned';
-      description = `Your emissions are near normal base rates. ${name} feels a bit warmer today. Try adopting public transit to clear the air.`;
-      bgGradient = 'from-amber-50 via-yellow-100 to-amber-200';
-      faceAccent = '#b45309';
-      break;
-    case 'high':
+    case 'concerned':
+      stateGroup = 'high';
       bodyColor = '#f97316'; // Deep Orange
       cheekColor = 'transparent'; // No cheeks
-      moodText = 'Feeling Very Stressed';
-      description = `High travel or electricity consumption is polluting ${name}'s atmosphere. The air is warm and dusty.`;
+      moodText = 'Slightly Concerned';
+      description = `Hmm... I noticed our emissions are creeping up a bit today. Nothing we can't tackle together!`;
       bgGradient = 'from-orange-100 via-stone-200 to-amber-200';
       faceAccent = '#7c2d12';
       break;
-    case 'critical':
+    case 'sad':
+      stateGroup = 'critical';
       bodyColor = '#78716c'; // Sick Ash Stone Gray
       cheekColor = 'transparent';
-      moodText = 'Severely Sick & Smoggy';
-      description = `Heavy emissions and waste accumulation are choking ${name}. Dead foliage, smoking plants, and thick smog surround it. Quick, complete some Challenges!`;
-      bgGradient = 'from-stone-300 via-neutral-400 to-zinc-500';
+      moodText = 'A Bit Sad & Worried';
+      description = `Emissions have increased a bit, making ${name} feel a little cloudy. Let's complete a Challenge and clear the air!`;
+      bgGradient = 'from-stone-400 via-neutral-300 to-zinc-500';
       faceAccent = '#292524';
+      break;
+    case 'motivational':
+      stateGroup = 'moderate';
+      bodyColor = '#f59e0b'; // Warm Amber
+      cheekColor = '#fef08a'; // Faint yellow cheek tint
+      moodText = 'Start Fresh Today!';
+      description = `Progress is about small steps, not perfection. ${name} is here to support you at every single swap!`;
+      bgGradient = 'from-amber-50 via-yellow-100 to-amber-200';
+      faceAccent = '#b45309';
+      break;
+    case 'playful':
+      stateGroup = 'good';
+      bodyColor = '#14b8a6'; // Playful Teal
+      cheekColor = '#fca5a5';
+      moodText = 'Giggly & Playful';
+      description = `Reusing items brings so much joy! Let's explore creative, sustainable habits today.`;
+      bgGradient = 'from-orange-50 via-teal-100 to-amber-100';
+      faceAccent = '#0f766e';
       break;
   }
 
@@ -919,6 +936,92 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
 
           </svg>
         </motion.div>
+      </div>
+
+      {/* Interactive Environment & Scenery Theme Swaps */}
+      <div className="w-full bg-white/80 backdrop-blur-sm rounded-2xl p-3 border border-art-border/80 mt-4 z-10">
+        <div className="flex flex-col gap-2">
+          <div className="flex justify-between items-center">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-art-olive">Scenery Habitat Theme</span>
+            <span className="text-[10px] font-mono font-bold text-art-dark">Ambient Audio Ready</span>
+          </div>
+          
+          <div className="grid grid-cols-4 gap-1">
+            {[
+              { id: 'forest', label: '🌲 Forest', bg: 'from-emerald-50 to-green-100', desc: 'Soothes Sprout with fresh oxygen flows.' },
+              { id: 'office', label: '🏠 Room', bg: 'from-stone-50 to-orange-100/60', desc: 'cozy indoor workspace settings.' },
+              { id: 'dome', label: '🌐 Dome', bg: 'from-sky-50 to-emerald-50', desc: 'Futuristic atmospheric bio-barrier.' },
+              { id: 'meadow', label: '☀️ Meadow', bg: 'from-yellow-50 to-amber-100/70', desc: 'Sunny open fields for energy accumulation.' }
+            ].map(theme => (
+              <button
+                key={theme.id}
+                onClick={() => {
+                  try {
+                    // Quick scenery feedback tone
+                    const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+                    if (AudioCtx) {
+                      const ctx = new AudioCtx();
+                      const osc = ctx.createOscillator();
+                      const gain = ctx.createGain();
+                      osc.connect(gain);
+                      gain.connect(ctx.destination);
+                      osc.frequency.setValueAtTime(theme.id === 'forest' ? 523 : theme.id === 'office' ? 440 : theme.id === 'dome' ? 659 : 587, ctx.currentTime);
+                      gain.gain.setValueAtTime(0.04, ctx.currentTime);
+                      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+                      osc.start();
+                      osc.stop(ctx.currentTime + 0.15);
+                    }
+                  } catch (e) {}
+                  playCuteSound('wink');
+                }}
+                className="px-1.5 py-2 text-[10px] font-bold rounded-lg border border-art-border bg-white hover:bg-slate-50 transition-all cursor-pointer text-center text-art-dark focus:ring-2 focus:ring-art-sage"
+                title={theme.desc}
+                aria-label={`Switch scenery theme to ${theme.label}`}
+              >
+                {theme.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Real-time Companion Emotional State Index */}
+      <div className="w-full bg-white/90 rounded-2xl p-4 border border-art-border mt-4 z-10 shadow-xs">
+        <span className="text-[10px] font-mono font-bold uppercase tracking-widest text-art-olive block mb-3 border-b border-art-border pb-1.5">
+          Sprout Vitality & Emotional Indicators
+        </span>
+
+        <div className="grid grid-cols-4 gap-2 text-center">
+          
+          <div className="space-y-1">
+            <div className="mx-auto w-10 h-10 rounded-full border-2 border-emerald-500 bg-emerald-50 flex items-center justify-center font-bold text-xs text-emerald-800">
+              {score}%
+            </div>
+            <span className="text-[10px] font-extrabold text-art-dark block">Happiness</span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="mx-auto w-10 h-10 rounded-full border-2 border-indigo-500 bg-indigo-50 flex items-center justify-center font-bold text-xs text-indigo-800">
+              {Math.min(100, Math.round(score * 1.08))}%
+            </div>
+            <span className="text-[10px] font-extrabold text-art-dark block">Oxygen Purity</span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="mx-auto w-10 h-10 rounded-full border-2 border-blue-500 bg-blue-50 flex items-center justify-center font-bold text-xs text-blue-800">
+              {score >= 50 ? '92%' : '45%'}
+            </div>
+            <span className="text-[10px] font-extrabold text-art-dark block">Hydration</span>
+          </div>
+
+          <div className="space-y-1">
+            <div className="mx-auto w-10 h-10 rounded-full border-2 border-amber-500 bg-amber-50 flex items-center justify-center font-bold text-xs text-amber-800">
+              {score >= 80 ? '98%' : score >= 60 ? '80%' : score >= 40 ? '62%' : '20%'}
+            </div>
+            <span className="text-[10px] font-extrabold text-art-dark block">Energy</span>
+          </div>
+
+        </div>
       </div>
 
       {/* Bottom informational card metadata */}

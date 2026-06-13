@@ -7,6 +7,8 @@ import AICoach from './components/AICoach';
 import Scanner from './components/Scanner';
 import Challenges from './components/Challenges';
 import ProfileAchievements from './components/ProfileAchievements';
+import FutureSimulator from './components/FutureSimulator';
+import WeeklyReport from './components/WeeklyReport';
 import { 
   Trees, Bot, Shield, Sparkles, LogOut, 
   Leaf, Trophy, Settings, Activity, Cpu, Scan, 
@@ -23,7 +25,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Active view states
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'twin' | 'coach' | 'scanner' | 'challenges' | 'profile'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'twin' | 'coach' | 'challenges' | 'profile' | 'simulator' | 'reports'>('dashboard');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
@@ -40,6 +42,38 @@ export default function App() {
   const [sandboxInput, setSandboxInput] = useState('');
   const [assistantTextInput, setAssistantTextInput] = useState('');
   const [speechRecognitionInstance, setSpeechRecognitionInstance] = useState<any>(null);
+  const [companionExpression, setCompanionExpression] = useState<'excited' | 'proud' | 'concerned' | 'sad' | 'motivational' | 'playful'>('proud');
+
+  // Customizable voice companion settings
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string>('');
+  const [voicePitch, setVoicePitch] = useState<number>(1.6); // Default to a cute high pitched companion
+  const [voiceRate, setVoiceRate] = useState<number>(1.05);
+
+  // Synchronize dynamic browser languages and voices
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      const loadWebVoices = () => {
+        const list = window.speechSynthesis.getVoices();
+        // Give preference to en or regional voices
+        const filtered = list.filter(v => v.lang.toLowerCase().includes('en') || v.lang.toLowerCase().includes('in'));
+        const finalSelection = filtered.length > 0 ? filtered : list;
+        setAvailableVoices(finalSelection);
+
+        if (finalSelection.length > 0) {
+          // Attempt default cute voice selection (e.g. Google US English, premium English, or first matching child friendly voice)
+          const preferred = finalSelection.find(v => v.name.includes('Google') && v.lang.includes('US')) ||
+                            finalSelection.find(v => v.lang.includes('US')) ||
+                            finalSelection.find(v => v.lang.includes('EN')) ||
+                            finalSelection[0];
+          setSelectedVoiceURI(p => p || preferred.voiceURI);
+        }
+      };
+
+      loadWebVoices();
+      window.speechSynthesis.onvoiceschanged = loadWebVoices;
+    }
+  }, []);
 
   // Initialize Speech Recognition cleanly in browser context
   useEffect(() => {
@@ -76,6 +110,9 @@ export default function App() {
               setTwinReplyText(data.reply);
               setVoiceStatus('speaking');
               setIsTwinSpeaking(true);
+              if (data.expression) {
+                setCompanionExpression(data.expression);
+              }
               
               if (data.profile) {
                 setProfile(data.profile);
@@ -85,8 +122,14 @@ export default function App() {
               if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 const utterance = new SpeechSynthesisUtterance(data.reply);
-                utterance.pitch = 1.6; // cute high pitched Sprout voice
-                utterance.rate = 1.05;
+                if (selectedVoiceURI) {
+                  const targetVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === selectedVoiceURI);
+                  if (targetVoice) {
+                    utterance.voice = targetVoice;
+                  }
+                }
+                utterance.pitch = voicePitch; 
+                utterance.rate = voiceRate;
                 utterance.onstart = () => {
                   setIsTwinSpeaking(true);
                   setVoiceStatus('speaking');
@@ -173,6 +216,9 @@ export default function App() {
         setTwinReplyText(data.greeting);
         setVoiceStatus('speaking');
         setIsTwinSpeaking(true);
+        if (data.expression) {
+          setCompanionExpression(data.expression);
+        }
 
         if (data.profile) {
           setProfile(data.profile);
@@ -181,8 +227,14 @@ export default function App() {
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.greeting);
-          utterance.pitch = 1.6;
-          utterance.rate = 1.05;
+          if (selectedVoiceURI) {
+            const targetVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === selectedVoiceURI);
+            if (targetVoice) {
+              utterance.voice = targetVoice;
+            }
+          }
+          utterance.pitch = voicePitch;
+          utterance.rate = voiceRate;
           utterance.onstart = () => {
             setIsTwinSpeaking(true);
             setVoiceStatus('speaking');
@@ -231,6 +283,9 @@ export default function App() {
         setTwinReplyText(data.reply);
         setVoiceStatus('speaking');
         setIsTwinSpeaking(true);
+        if (data.expression) {
+          setCompanionExpression(data.expression);
+        }
 
         if (data.profile) {
           setProfile(data.profile);
@@ -239,8 +294,14 @@ export default function App() {
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();
           const utterance = new SpeechSynthesisUtterance(data.reply);
-          utterance.pitch = 1.6;
-          utterance.rate = 1.05;
+          if (selectedVoiceURI) {
+            const targetVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === selectedVoiceURI);
+            if (targetVoice) {
+              utterance.voice = targetVoice;
+            }
+          }
+          utterance.pitch = voicePitch;
+          utterance.rate = voiceRate;
           utterance.onstart = () => {
             setIsTwinSpeaking(true);
           };
@@ -549,8 +610,9 @@ export default function App() {
               {[
                 { id: 'dashboard', label: '📊 Insights Dashboard' },
                 { id: 'twin', label: `🦖 Virtual Twin Workspace` },
+                { id: 'simulator', label: `🔮 Footprint Simulator` },
+                { id: 'reports', label: `📜 AI Weekly Reports` },
                 { id: 'coach', label: '💬 AI Eco Q&A Coach' },
-                { id: 'scanner', label: '📷 Receipt Bill Scanner' },
                 { id: 'challenges', label: '🏆 Green Challenges' },
                 { id: 'profile', label: '⚙️ Profile Achievements' }
               ].map(tab => (
@@ -601,76 +663,109 @@ export default function App() {
                         equippedAccessories={profile.companion.equippedAccessories}
                         name={profile.companion.name}
                         moodState={petMoodAction}
+                        currentMood={companionExpression}
                       />
 
-                      {/* Interactive sandbox buttons */}
-                      <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-md">
-                        <div className="flex justify-between items-center mb-4">
+                      {/* Custom Voice Customizer and direct Speech test preview */}
+                      <div className="bg-white rounded-3xl p-6 border-2 border-art-dark shadow-md space-y-4">
+                        <div className="flex justify-between items-center pb-2 border-b-2 border-slate-100">
                           <div>
-                            <h4 className="font-display font-bold text-slate-900 text-sm">Interactive Sandbox</h4>
-                            <p className="text-xs text-gray-500 mt-0.5">Let's interact with Sprout! Perform activities or write quick actions to see reactions.</p>
+                            <h4 className="font-serif italic font-bold text-slate-900 text-sm flex items-center gap-1.5">
+                              🎙️ Voice Selection & Customization
+                            </h4>
+                            <p className="text-[11px] text-gray-500 mt-0.5">Choose your companion's speaking voice below and click the preview button to test!</p>
                           </div>
                         </div>
 
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                          <button
-                            onClick={() => {
-                              setPetMoodAction('feed');
-                              setTimeout(() => setPetMoodAction('idle'), 2500);
-                            }}
-                            className="bg-emerald-50 hover:bg-emerald-100/80 text-emerald-800 p-3.5 rounded-2xl border border-emerald-200 text-xs font-semibold cursor-pointer text-center md:col-span-1"
-                          >
-                            🍎 Feed Organic Apple
-                          </button>
-                          <button
-                            onClick={() => {
-                              setPetMoodAction('dance');
-                              setTimeout(() => setPetMoodAction('idle'), 2500);
-                            }}
-                            className="bg-teal-50 hover:bg-teal-100/80 text-teal-800 p-3.5 rounded-2xl border border-teal-200 text-xs font-semibold cursor-pointer text-center md:col-span-1"
-                          >
-                            🎵 Do Joyful Leap
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleLogAction('energy', 'Washed clothes with cold water', -1.2, 25);
-                            }}
-                            className="bg-purple-50 hover:bg-purple-100/80 text-purple-800 p-3.5 rounded-2xl border border-purple-200 text-xs font-semibold cursor-pointer text-center md:col-span-1"
-                          >
-                            💧 Wash Laundry Cold
-                          </button>
-                          <button
-                            onClick={() => {
-                              handleLogAction('transport', 'Carpooled with roommate', -3.0, 30);
-                            }}
-                            className="bg-amber-50 hover:bg-amber-100/80 text-amber-800 p-3.5 rounded-2xl border border-amber-200 text-xs font-semibold cursor-pointer text-center md:col-span-1"
-                          >
-                            🚗 Carpool Roommate
-                          </button>
-                        </div>
-
-                        {/* Quick custom sandbox actions logger */}
-                        <div className="mt-4 pt-4 border-t border-slate-100 space-y-2">
-                          <label className="text-[10px] font-bold text-slate-650 block uppercase tracking-wider">Log custom Sandbox activity:</label>
-                          <div className="flex gap-2">
-                            <input 
-                              type="text"
-                              placeholder="e.g. reused cardboard box, reduced power standby..."
-                              value={sandboxInput}
-                              onChange={(e) => setSandboxInput(e.target.value)}
-                              className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-1.5 text-xs focus:outline-none focus:border-emerald-500 font-sans text-slate-800"
-                            />
-                            <button 
-                              onClick={() => {
-                                if (!sandboxInput.trim()) return;
-                                handleLogAction('general', sandboxInput, -1.5, 25);
-                                setSandboxInput('');
-                              }}
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3.5 py-1.5 rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1 leading-none cursor-pointer shrink-0"
-                            >
-                              ⚡ Log Action
-                            </button>
+                        <div className="space-y-4">
+                          {/* Active Voice Selector */}
+                          <div>
+                            <label className="text-[10px] font-black text-slate-650 uppercase tracking-wider mb-1 block">
+                              Available Voices in system:
+                            </label>
+                            {availableVoices.length > 0 ? (
+                              <select 
+                                value={selectedVoiceURI} 
+                                onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                                className="bg-slate-50 border-2 border-art-dark rounded-xl px-3 py-2 w-full text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                              >
+                                {availableVoices.map((voice) => (
+                                  <option key={voice.voiceURI} value={voice.voiceURI}>
+                                    {voice.name} ({voice.lang})
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="text-[11px] text-zinc-500 font-mono italic p-2 bg-slate-50 border border-slate-200 rounded-xl">
+                                Looking for device system voices... browser default voice is active.
+                              </div>
+                            )}
                           </div>
+
+                          {/* sliders grid */}
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Pitch Tone */}
+                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                              <div className="flex justify-between items-center text-[10px] font-black text-slate-650 uppercase tracking-wider mb-1.5">
+                                <span>Voice Pitch:</span>
+                                <span className="text-emerald-700 font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  {voicePitch === 1.6 ? 'Cute' : voicePitch < 1.0 ? 'Deep' : voicePitch > 1.6 ? 'Squeaky' : 'Balanced'} ({voicePitch.toFixed(1)}x)
+                                </span>
+                              </div>
+                              <input 
+                                type="range"
+                                min="0.5"
+                                max="2.0"
+                                step="0.1"
+                                value={voicePitch}
+                                onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
+                                className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                              />
+                            </div>
+
+                            {/* Speaking Speed Rate */}
+                            <div className="bg-slate-50/50 p-3 rounded-2xl border border-slate-100">
+                              <div className="flex justify-between items-center text-[10px] font-black text-slate-650 uppercase tracking-wider mb-1.5">
+                                <span>Speaking Speed:</span>
+                                <span className="text-emerald-700 font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                                  {voiceRate === 1.05 ? 'Normal' : voiceRate < 1.0 ? 'Slower' : 'Faster'} ({voiceRate.toFixed(2)}x)
+                                </span>
+                              </div>
+                              <input 
+                                type="range"
+                                min="0.7"
+                                max="1.5"
+                                step="0.05"
+                                value={voiceRate}
+                                onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
+                                className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Auditory Preview Trigger */}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if ('speechSynthesis' in window) {
+                                window.speechSynthesis.cancel();
+                                const utterance = new SpeechSynthesisUtterance(`Hi there! My name is ${profile.companion.name}. This is my sweet new custom voice speaking to you!`);
+                                if (selectedVoiceURI) {
+                                  const targetVoice = window.speechSynthesis.getVoices().find(v => v.voiceURI === selectedVoiceURI);
+                                  if (targetVoice) {
+                                    utterance.voice = targetVoice;
+                                  }
+                                }
+                                utterance.pitch = voicePitch;
+                                utterance.rate = voiceRate;
+                                window.speechSynthesis.speak(utterance);
+                              }
+                            }}
+                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer text-xs uppercase"
+                          >
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
+                            Hear Selected Voice Test!
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -749,20 +844,30 @@ export default function App() {
                   </div>
                 )}
 
+                {/* FX. CARBON FUTURE FOOTPRINT SIMULATOR */}
+                {activeTab === 'simulator' && (
+                  <FutureSimulator 
+                    stats={profile.stats}
+                    companionName={profile.companion.name}
+                  />
+                )}
+
+                {/* RX. AI WEEKLY REPORTS */}
+                {activeTab === 'reports' && (
+                  <WeeklyReport 
+                    userId={profile.userId}
+                    stats={profile.stats}
+                    logs={profile.logs}
+                    companionName={profile.companion.name}
+                  />
+                )}
+
                 {/* C. AI SUSTAINABILITY COACH */}
                 {activeTab === 'coach' && (
                   <AICoach 
                     userId={profile.userId}
                     companionName={profile.companion.name}
                     score={profile.stats.score}
-                  />
-                )}
-
-                {/* D. RECEIPT AND BILL SCANNER */}
-                {activeTab === 'scanner' && (
-                  <Scanner 
-                    userId={profile.userId}
-                    onRefreshProfile={reloadProfileStats}
                   />
                 )}
 
@@ -879,6 +984,7 @@ export default function App() {
                         equippedAccessories={profile.companion.equippedAccessories}
                         name={profile.companion.name}
                         isSpeaking={isTwinSpeaking}
+                        currentMood={companionExpression}
                       />
                     </div>
                     <span className="font-bold text-[13px] text-art-dark mt-2 block">{profile.companion.name} is listening</span>
@@ -910,6 +1016,84 @@ export default function App() {
                       {voiceStatus === 'idle' && (
                         <span className="text-[10px] text-art-olive/80 font-mono uppercase font-black tracking-wide">Ears Open • Tap the Mic</span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Custom Voice Settings Card */}
+                  <div className="bg-[#FAF9F5] border-2 border-art-dark rounded-2xl p-3.5 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif font-bold italic text-xs text-art-forest flex items-center gap-1.5">
+                        🎙️ Voice Setup & Customization
+                      </span>
+                      <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[9px] uppercase">
+                        Web Speech API
+                      </span>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {/* Active Voice Selection */}
+                      <div>
+                        <label className="text-[10px] font-bold text-art-olive uppercase mb-1 block">Selected Assistant Voice:</label>
+                        {availableVoices.length > 0 ? (
+                          <select 
+                            value={selectedVoiceURI} 
+                            onChange={(e) => setSelectedVoiceURI(e.target.value)}
+                            className="bg-white border-2 border-art-dark rounded-xl px-2.5 py-1.5 w-full text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                          >
+                            {availableVoices.map((voice) => (
+                              <option key={voice.voiceURI} value={voice.voiceURI}>
+                                {voice.name} ({voice.lang})
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-[10px] text-zinc-500 font-mono italic">
+                            No external system voices found. Using browser default.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Pitch scale slider */}
+                      <div>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-art-olive uppercase mb-1">
+                          <span>Voice Pitch-Tone:</span>
+                          <span className="text-emerald-700 font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-slate-150">
+                            {voicePitch === 1.6 ? 'Cute & Small' : voicePitch < 1.0 ? 'Deep & Bold' : voicePitch > 1.6 ? 'Squeaky!' : 'Sweet Spot'} ({voicePitch.toFixed(1)}x)
+                          </span>
+                        </div>
+                        <input 
+                          type="range"
+                          min="0.5"
+                          max="2.0"
+                          step="0.1"
+                          value={voicePitch}
+                          onChange={(e) => setVoicePitch(parseFloat(e.target.value))}
+                          className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                        />
+                        <div className="flex justify-between text-[9px] text-slate-500 mt-0.5">
+                          <span>Deep Coach (0.5x)</span>
+                          <span>Cute Companion (2.0x)</span>
+                        </div>
+                      </div>
+
+                      {/* Speed Rate slider */}
+                      <div>
+                        <div className="flex justify-between items-center text-[10px] font-bold text-art-olive uppercase mb-1">
+                          <span>Speaking Speed:</span>
+                          <span className="text-emerald-700 font-mono font-bold bg-white px-1.5 py-0.5 rounded border border-slate-150">
+                            {voiceRate === 1.05 ? 'Normal' : voiceRate < 1.0 ? 'Slower' : 'Faster'} ({voiceRate.toFixed(2)}x)
+                          </span>
+                        </div>
+                        <input 
+                          type="range"
+                          min="0.7"
+                          max="1.5"
+                          step="0.05"
+                          value={voiceRate}
+                          onChange={(e) => setVoiceRate(parseFloat(e.target.value))}
+                          className="w-full accent-emerald-600 h-1.5 bg-slate-200 rounded-lg cursor-pointer"
+                        />
+                      </div>
                     </div>
                   </div>
 

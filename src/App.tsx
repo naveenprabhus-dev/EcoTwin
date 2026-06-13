@@ -447,6 +447,8 @@ export default function App() {
         msg = 'Incorrect email address or security password.';
       } else if (err.code === 'auth/too-many-requests') {
         msg = 'Temporary login lock. Too many bad attempts. Try again in a minute.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        msg = "Email and Password authentication is not enabled for this Firebase project. To enable it: Go to your Firebase Console -> Build -> Authentication -> Sign-in Method, and enable the 'Email/Password' provider.";
       }
       setAuthError(msg);
     } finally {
@@ -503,6 +505,8 @@ export default function App() {
         msg = 'The email address formatting is invalid.';
       } else if (err.code === 'auth/weak-password') {
         msg = 'The entered password is too weak. Try adding symbols and numbers.';
+      } else if (err.code === 'auth/operation-not-allowed') {
+        msg = "Email and Password authentication is not enabled for this Firebase project. To enable it: Go to your Firebase Console -> Build -> Authentication -> Sign-in Method, and enable the 'Email/Password' provider.";
       }
       setAuthError(msg);
     } finally {
@@ -596,9 +600,13 @@ export default function App() {
       setCurrentUser(user.uid);
       setUserEmail('guest@ecotwin.local');
       setIsWaitingVerification(false);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Guest flow failed:", err);
-      setAuthError('Unable to spin sandbox instantly. Try standard email signup.');
+      let msg = 'Unable to spin sandbox instantly. Try standard email signup.';
+      if (err.code === 'auth/operation-not-allowed') {
+        msg = "Anonymous Sign-in is not enabled for this Firebase project. To enable it: Go to your Firebase Console -> Build -> Authentication -> Sign-in Method, and enable the 'Anonymous' provider.";
+      }
+      setAuthError(msg);
     } finally {
       setIsAuthLoading(false);
     }

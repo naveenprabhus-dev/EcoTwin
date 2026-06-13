@@ -1,0 +1,30 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Enterprise profile schema representing user carbon twin state, stats, companion details, and logs.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The unique authenticated Firebase User ID." },
+        "email": { "type": "string", "format": "email", "description": "Authenticated email address." },
+        "name": { "type": "string", "description": "User visible name." },
+        "onboarded": { "type": "boolean", "description": "Whether the user completed the onboarding wizard." },
+        "onboarding": { "type": "object", "description": "Onboarding demographic choices." },
+        "companion": { "type": "object", "description": "Active virtual companion configuration status." },
+        "challenges": { "type": "array", "description": "Weekly status items tracking claimed challenges." },
+        "logs": { "type": "array", "description": "Historical array of eco logged habits and items." },
+        "stats": { "type": "object", "description": "Compiled and certified carbon footprint stats statistics." },
+        "conversations": { "type": "array", "description": "Previous AI companion talk message exchanges." },
+        "twin_state": { "type": "array", "description": "Historical mental and emotional track indexes of companion." },
+        "sustainability_scores": { "type": "array", "description": "Historical carbon footprint score metrics tracker." }
+      },
+      "required": ["userId", "email", "name", "onboarded", "onboarding", "companion", "challenges", "logs", "stats"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "Secure storage directory mapping authentic user profile data to individual owners."
+    }
+  }
+}

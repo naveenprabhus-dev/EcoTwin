@@ -1,0 +1,18 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net - default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Robust user profile protection (Zero-Trust)
+    match /users/{userId} {
+      // Allow read/write only if the requester is verified and authenticating on their matching document
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId;
+      allow delete: if false; // Profiles cannot be maliciously deleted from client
+    }
+  }
+}

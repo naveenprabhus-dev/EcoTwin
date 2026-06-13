@@ -17,17 +17,52 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
+// Firebase client SDK integrations
+import { 
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut,
+  sendEmailVerification,
+  sendPasswordResetEmail,
+  signInAnonymously,
+  updateProfile
+} from 'firebase/auth';
+import { auth } from './lib/firebase';
+
 export default function App() {
+  // Real Firebase Authentication states
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot'>('login');
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
+  const [isAuthInitLoading, setIsAuthInitLoading] = useState(true);
+  const [isWaitingVerification, setIsWaitingVerification] = useState(false);
+  const [verifiedUserPlaceholder, setVerifiedUserPlaceholder] = useState<any>(null);
+
+  // Sign up inputs
+  const [signupName, setSignupName] = useState('');
+  const [signupEmail, setSignupEmail] = useState('');
+  const [signupPassword, setSignupPassword] = useState('');
+  const [signupConfirmPassword, setSignupConfirmPassword] = useState('');
+
+  // Login inputs
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Forgot password inputs
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotSuccessMsg, setForgotSuccessMsg] = useState('');
+  const [resendSuccessMsg, setResendSuccessMsg] = useState('');
+
   // Authentication states
   const [userEmail, setUserEmail] = useState('');
   const [currentUser, setCurrentUser] = useState<string | null>(null);
-  const [isLarpingAuth, setIsLarpingAuth] = useState(false);
   const [authError, setAuthError] = useState('');
 
   // Active view states
   const [activeTab, setActiveTab] = useState<'dashboard' | 'twin' | 'coach' | 'challenges' | 'profile' | 'simulator' | 'reports'>('dashboard');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
+
 
   // Momentary companion visual triggers (for physical feeding, jumping)
   const [petMoodAction, setPetMoodAction] = useState<'feed' | 'dance' | 'idle' | 'petted'>('idle');
@@ -344,39 +379,243 @@ export default function App() {
     }
   };
 
+  // 1. Firebase Auth listener to maintain persistence
   useEffect(() => {
-    if (currentUser) {
-      fetchProfile(currentUser, userEmail);
-    }
-  }, [currentUser]);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      try {
+        if (firebaseUser) {
+          // Dynamic status reload check
+          await firebaseUser.reload();
+          
+          if (firebaseUser.emailVerified || firebaseUser.isAnonymous) {
+            setCurrentUser(firebaseUser.uid);
+            setUserEmail(firebaseUser.email || 'guest@ecotwin.local');
+            setAuthError('');
+            setIsWaitingVerification(false);
+            setVerifiedUserPlaceholder(null);
+            fetchProfile(firebaseUser.uid, firebaseUser.email || 'guest@ecotwin.local');
+          } else {
+            // Not activated yet – place them in pending
+            setCurrentUser(null);
+            setVerifiedUserPlaceholder(firebaseUser);
+            setIsWaitingVerification(true);
+          }
+        } else {
+          setCurrentUser(null);
+          setVerifiedUserPlaceholder(null);
+          setIsWaitingVerification(false);
+        }
+      } catch (err) {
+        console.error("Auth state synchronizer error:", err);
+      } finally {
+        setIsAuthInitLoading(false);
+      }
+    });
 
-  // Auth logins
-  const handleAuthen = (e: React.FormEvent) => {
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Form submission for traditional email sign-in
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userEmail.trim()) {
-      setAuthError('Please enter a valid email address.');
+    if (!loginEmail.trim() || !loginPassword) {
+      setAuthError('Please enter both email and password.');
       return;
     }
+
     setAuthError('');
-    setIsLarpingAuth(true);
+    setIsAuthLoading(true);
 
-    setTimeout(() => {
-      // Use clean sanitised string of email to map key values
-      const sanitizedId = userEmail.replace(/[^a-zA-Z0-9]/g, "_").toLowerCase();
-      setCurrentUser(sanitizedId);
-      setIsLarpingAuth(false);
-    }, 1000);
+    try {
+      const credential = await signInWithEmailAndPassword(auth, loginEmail, loginPassword);
+      const user = credential.user;
+      
+      await user.reload();
+      if (!user.emailVerified) {
+        setIsWaitingVerification(true);
+        setVerifiedUserPlaceholder(user);
+        setAuthError('Your email address must be verified. Please click the confirmation link in your inbox.');
+      } else {
+        setCurrentUser(user.uid);
+        setUserEmail(user.email || '');
+        setAuthError('');
+      }
+    } catch (err: any) {
+      console.error("Login failure:", err);
+      let msg = 'Failed to sign in. Verify your email credentials or network connection.';
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/invalid-email' || err.code === 'auth/wrong-password' || err.code === 'auth/user-not-found') {
+        msg = 'Incorrect email address or security password.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Temporary login lock. Too many bad attempts. Try again in a minute.';
+      }
+      setAuthError(msg);
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
-  const handlePlayGuest = () => {
-    setUserEmail('naveenprabhuvitap@gmail.com');
-    setCurrentUser('demo-user');
+  // 3. Form submission for account creation
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthError('');
+
+    if (!signupName.trim() || !signupEmail.trim() || !signupPassword || !signupConfirmPassword) {
+      setAuthError('Please fill out all the input fields.');
+      return;
+    }
+
+    if (signupPassword.length < 6) {
+      setAuthError('Security passwords must be at least 6 characters in length.');
+      return;
+    }
+
+    if (signupPassword !== signupConfirmPassword) {
+      setAuthError('Confirm password does not match original password.');
+      return;
+    }
+
+    setIsAuthLoading(true);
+
+    try {
+      // Create user credential
+      const credential = await createUserWithEmailAndPassword(auth, signupEmail, signupPassword);
+      const user = credential.user;
+
+      // Update user display name profile
+      await updateProfile(user, { displayName: signupName });
+
+      // Send email verification link
+      await sendEmailVerification(user);
+
+      // Create backend index placeholder
+      await fetch(`/api/profile?userId=${user.uid}&email=${encodeURIComponent(signupEmail)}`);
+
+      // Set state pending
+      setVerifiedUserPlaceholder(user);
+      setIsWaitingVerification(true);
+      setAuthError('');
+    } catch (err: any) {
+      console.error("Registration error:", err);
+      let msg = 'Failed to registers eco account. Try again.';
+      if (err.code === 'auth/email-already-in-use') {
+        msg = 'This email address is already in use by another companion profile.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'The email address formatting is invalid.';
+      } else if (err.code === 'auth/weak-password') {
+        msg = 'The entered password is too weak. Try adding symbols and numbers.';
+      }
+      setAuthError(msg);
+    } finally {
+      setIsAuthLoading(false);
+    }
   };
 
-  const handleLogout = () => {
+  // 4. Send secure password reset link
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) {
+      setAuthError('Please specify an email to register password resets.');
+      return;
+    }
+
+    setAuthError('');
+    setForgotSuccessMsg('');
+    setIsAuthLoading(true);
+
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail);
+      setForgotSuccessMsg('An authorization password-reset link has been successfully dispatched to your email.');
+    } catch (err: any) {
+      console.error("Forgot password failure:", err);
+      let msg = 'Failed to submit password dispatch link.';
+      if (err.code === 'auth/user-not-found') {
+        msg = 'We could not locate an eco-account with that email address.';
+      } else if (err.code === 'auth/invalid-email') {
+        msg = 'Invalid email address formatting specification.';
+      }
+      setAuthError(msg);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // 5. Verification Checkpoint Status poll
+  const handleCheckVerification = async () => {
+    if (!verifiedUserPlaceholder) return;
+    setIsAuthLoading(true);
+    setAuthError('');
+    try {
+      await verifiedUserPlaceholder.reload();
+      if (verifiedUserPlaceholder.emailVerified) {
+        setCurrentUser(verifiedUserPlaceholder.uid);
+        setUserEmail(verifiedUserPlaceholder.email || '');
+        setIsWaitingVerification(false);
+        setVerifiedUserPlaceholder(null);
+        setAuthError('');
+        // Trigger profile reload
+        fetchProfile(verifiedUserPlaceholder.uid, verifiedUserPlaceholder.email || '');
+      } else {
+        setAuthError('Email has not been verified yet. Check spam or request a resend link.');
+      }
+    } catch (err) {
+      console.error("Verification reload failed:", err);
+      setAuthError('Unable to reload status. Please verify networking.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // 6. Resend verification trigger
+  const handleResendActivation = async () => {
+    if (!verifiedUserPlaceholder) return;
+    setResendSuccessMsg('');
+    setAuthError('');
+    setIsAuthLoading(true);
+    try {
+      await sendEmailVerification(verifiedUserPlaceholder);
+      setResendSuccessMsg('A fresh verification link has been successfully resent to your email!');
+    } catch (err) {
+      console.error("Resend failure:", err);
+      setAuthError('Failed to trigger resend. Try again shortly.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // 7. Sign in anonymously as Guest Sandbox
+  const handlePlayGuest = async () => {
+    setAuthError('');
+    setIsAuthLoading(true);
+    try {
+      const credential = await signInAnonymously(auth);
+      const user = credential.user;
+      
+      // Initialize sandbox configuration on demand
+      await fetch(`/api/profile?userId=${user.uid}&email=guest@ecotwin.local`);
+      
+      setCurrentUser(user.uid);
+      setUserEmail('guest@ecotwin.local');
+      setIsWaitingVerification(false);
+    } catch (err) {
+      console.error("Guest flow failed:", err);
+      setAuthError('Unable to spin sandbox instantly. Try standard email signup.');
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  // 8. Sign out completely
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
     setCurrentUser(null);
+    setVerifiedUserPlaceholder(null);
     setProfile(null);
     setUserEmail('');
+    setIsWaitingVerification(false);
     setActiveTab('dashboard');
   };
 
@@ -385,7 +624,7 @@ export default function App() {
     if (updatedUser) {
       setProfile(updatedUser);
     } else if (currentUser) {
-      fetchProfile(currentUser);
+      fetchProfile(currentUser, userEmail);
     }
   };
 
@@ -441,8 +680,18 @@ export default function App() {
   return (
     <div className="bg-art-cream min-h-screen text-art-text font-sans antialiased selection:bg-art-pale selection:text-art-dark transition-colors duration-200">
       
+      {/* 0. AUTHENTICATION INIT LOADING STATE */}
+      {isAuthInitLoading && (
+        <div className="min-h-screen flex items-center justify-center bg-art-cream">
+          <div className="text-center space-y-4">
+            <Loader2 className="w-8 h-8 animate-spin text-art-forest mx-auto" />
+            <p className="text-xs font-mono tracking-widest text-art-olive uppercase">Calibrating Carbon Twin Environment...</p>
+          </div>
+        </div>
+      )}
+
       {/* 1. AUTHENTICATION / LANDING SPLASH */}
-      {!currentUser && (
+      {!isAuthInitLoading && !currentUser && (
         <div className="relative min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-art-pale via-art-cream to-art-pale overflow-hidden">
           
           {/* Subtle eco design backdrops */}
@@ -452,7 +701,7 @@ export default function App() {
           <motion.div 
             initial={{ opacity: 0, y: 30 }} 
             animate={{ opacity: 1, y: 0 }}
-            className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white rounded-[32px] border border-art-border shadow-2xl overflow-hidden min-h-[520px]"
+            className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-2 bg-white rounded-[32px] border border-art-border shadow-2xl overflow-hidden min-h-[580px]"
           >
             {/* Left Col: Brand Presentation */}
             <div className="bg-art-forest text-art-stone p-12 flex flex-col justify-between relative overflow-hidden">
@@ -465,7 +714,7 @@ export default function App() {
                 <span className="font-serif italic text-2xl font-bold tracking-tight text-white">EcoTwin</span>
               </div>
 
-              <div className="space-y-4">
+              <div className="space-y-4 my-8 md:my-0">
                 <span className="text-xs font-mono uppercase tracking-widest text-art-sage font-bold bg-white/5 border border-white/10 px-3 py-1 rounded-full w-max block">
                   AI-powered Carbon Twin Space
                 </span>
@@ -479,62 +728,317 @@ export default function App() {
 
               <div className="pt-4 border-t border-white/10">
                 <p className="text-xs text-slate-300 flex items-center gap-1.5 leading-normal">
-                  <Cpu className="w-3.5 h-3.5 text-art-sage" /> Powered by Gemini multimodal intelligence models.
+                  <Cpu className="w-3.5 h-3.5 text-art-sage" /> Powered by Gemini multimodal intelligence models and Firebase cloud storage.
                 </p>
               </div>
             </div>
 
             {/* Right Col: Forms & Interactive Play */}
-            <div className="p-12 flex flex-col justify-center space-y-6 bg-white">
-              <div>
-                <h2 className="text-3xl font-serif italic font-bold text-art-dark">Let's Get Started</h2>
-                <p className="text-xs text-art-olive mt-1 font-medium">Configure your workspace or access sandbox profiles instantly.</p>
-              </div>
+            <div className="p-12 flex flex-col justify-center space-y-6 bg-white min-h-[520px]">
+              
+              {/* WAITING FOR EMAIL VERIFICATION SCREEN */}
+              {isWaitingVerification ? (
+                <div className="space-y-6 text-center md:text-left">
+                  <div className="w-16 h-16 bg-art-pale rounded-full flex items-center justify-center mx-auto md:mx-0">
+                    <Mail className="w-8 h-8 text-art-forest" />
+                  </div>
+                  <div>
+                    <h2 className="text-3xl font-serif italic font-bold text-art-dark">Verify Your Inbox</h2>
+                    <p className="text-xs text-art-olive mt-1.5 leading-relaxed font-semibold">
+                      We've dispatched a secure verification email to <span className="text-art-dark block font-bold font-mono text-sm mt-1">{verifiedUserPlaceholder?.email}</span>. Click the verification link inside to activate your EcoTwin profile.
+                    </p>
+                  </div>
 
-              <form onSubmit={handleAuthen} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-art-dark block">Email Address:</label>
-                  <div className="relative">
-                    <input
-                      type="email"
-                      placeholder="e.g. naveenprabhuvitap@gmail.com"
-                      value={userEmail}
-                      onChange={(e) => setUserEmail(e.target.value)}
-                      className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3.5 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark"
-                      required
-                    />
-                    <Mail className="absolute left-3.5 top-4 w-4 h-4 text-art-olive/60" />
+                  {authError && (
+                    <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl">
+                      <p className="text-xs text-rose-600 font-bold">{authError}</p>
+                    </div>
+                  )}
+
+                  {resendSuccessMsg && (
+                    <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-xl">
+                      <p className="text-xs text-emerald-700 font-bold">{resendSuccessMsg}</p>
+                    </div>
+                  )}
+
+                  <div className="space-y-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={handleCheckVerification}
+                      disabled={isAuthLoading}
+                      className="w-full bg-art-dark hover:bg-art-forest text-white rounded-2xl py-3.5 text-xs font-black shadow-md flex items-center justify-center gap-2 cursor-pointer transition-all hover:translate-y-[-1px] disabled:opacity-50"
+                    >
+                      {isAuthLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Ready! Let me Log In'}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={handleResendActivation}
+                        disabled={isAuthLoading}
+                        className="bg-art-cream text-art-dark border border-art-border hover:bg-art-pale/40 rounded-2xl py-3 text-xs font-bold transition-all cursor-pointer text-center"
+                      >
+                        Resend Code
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        className="bg-white text-art-olive hover:text-art-dark hover:bg-slate-50 border border-slate-200 rounded-2xl py-3 text-xs font-bold transition-all cursor-pointer text-center"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
                 </div>
+              ) : (
+                <>
+                  {/* FORGOT PASSWORD SCREEN */}
+                  {authMode === 'forgot' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-3xl font-serif italic font-bold text-art-dark">Recover Password</h2>
+                        <p className="text-xs text-art-olive mt-1 font-medium">Specify your registered email and we'll dispatch a secure recovery link.</p>
+                      </div>
 
-                {authError && (
-                  <p className="text-xs text-rose-600 font-semibold">{authError}</p>
-                )}
+                      <form onSubmit={handleForgotPassword} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-art-dark block">Email Address:</label>
+                          <div className="relative">
+                            <input
+                              type="email"
+                              placeholder="e.g. xyz@gmail.com"
+                              value={forgotEmail}
+                              onChange={(e) => setForgotEmail(e.target.value)}
+                              className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3.5 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                              required
+                            />
+                            <Mail className="absolute left-3.5 top-4 w-4 h-4 text-art-olive/60" />
+                          </div>
+                        </div>
 
-                <button
-                  type="submit"
-                  disabled={isLarpingAuth}
-                  className="w-full bg-art-dark hover:bg-art-forest text-white rounded-2xl py-3.5 text-xs font-bold font-display shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:translate-y-[-1px]"
-                >
-                  {isLarpingAuth ? 'Verifying Credentials...' : 'Authenticate Account'}
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
+                        {authError && (
+                          <p className="text-xs text-rose-600 font-semibold">{authError}</p>
+                        )}
 
-              <div className="relative flex py-2 items-center">
-                <div className="flex-grow border-t border-art-border"></div>
-                <span className="flex-shrink mx-4 text-[10px] text-art-olive uppercase font-mono font-black">Or Play Sandbox</span>
-                <div className="flex-grow border-t border-art-border"></div>
-              </div>
+                        {forgotSuccessMsg && (
+                          <div className="p-3.5 bg-emerald-50 border border-emerald-100 rounded-2xl">
+                            <p className="text-xs text-emerald-800 font-bold leading-relaxed">{forgotSuccessMsg}</p>
+                          </div>
+                        )}
 
-              {/* Quick Guest Play Button */}
-              <button
-                type="button"
-                onClick={handlePlayGuest}
-                className="w-full bg-art-pale hover:bg-art-pale/80 border border-art-border text-art-dark rounded-2xl py-3.5 text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all"
-              >
-                <Sparkles className="w-4 h-4 text-art-olive fill-art-pale" /> Play Instantly as Guest (Recommended)
-              </button>
+                        <button
+                          type="submit"
+                          disabled={isAuthLoading}
+                          className="w-full bg-art-dark hover:bg-art-forest text-white rounded-2xl py-3.5 text-xs font-bold shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:translate-y-[-1px] disabled:opacity-55"
+                        >
+                          {isAuthLoading ? 'Sending Dispatch Reset...' : 'Send Password Reset Link'}
+                        </button>
+                      </form>
+
+                      <div className="text-center">
+                        <button
+                          type="button"
+                          onClick={() => { setAuthMode('login'); setAuthError(''); setForgotSuccessMsg(''); }}
+                          className="text-xs text-art-dark font-black hover:underline cursor-pointer"
+                        >
+                          Back to Log In
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* SIGN UP SCREEN */}
+                  {authMode === 'signup' && (
+                    <div className="space-y-4">
+                      <div>
+                        <h2 className="text-3xl font-serif italic font-bold text-art-dark">Join EcoTwin</h2>
+                        <p className="text-xs text-art-olive mt-1 font-medium">Register to begin mapping and matching your Carbon footprints.</p>
+                      </div>
+
+                      <form onSubmit={handleSignUp} className="space-y-3.5">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-art-dark block">Full Name:</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              placeholder="Your full name"
+                              value={signupName}
+                              onChange={(e) => setSignupName(e.target.value)}
+                              className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                              required
+                            />
+                            <UserIcon className="absolute left-3.5 top-3.5 w-4 h-4 text-art-olive/60" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-art-dark block">Email Address:</label>
+                          <div className="relative">
+                            <input
+                              type="email"
+                              placeholder="xyz@gmail.com"
+                              value={signupEmail}
+                              onChange={(e) => setSignupEmail(e.target.value)}
+                              className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                              required
+                            />
+                            <Mail className="absolute left-3.5 top-3.5 w-4 h-4 text-art-olive/60" />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-art-dark block">Password:</label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                placeholder="Min 6 chars"
+                                value={signupPassword}
+                                onChange={(e) => setSignupPassword(e.target.value)}
+                                className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                                required
+                              />
+                              <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-art-olive/60" />
+                            </div>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-art-dark block">Confirm:</label>
+                            <div className="relative">
+                              <input
+                                type="password"
+                                placeholder="..."
+                                value={signupConfirmPassword}
+                                onChange={(e) => setSignupConfirmPassword(e.target.value)}
+                                className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                                required
+                              />
+                              <Lock className="absolute left-3.5 top-3.5 w-4 h-4 text-art-olive/60" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {authError && (
+                          <p className="text-xs text-rose-600 font-semibold">{authError}</p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isAuthLoading}
+                          className="w-full bg-art-dark hover:bg-art-forest text-white rounded-2xl py-3.5 text-xs font-bold shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:translate-y-[-1px] disabled:opacity-55"
+                        >
+                          {isAuthLoading ? 'Dispatching Verification...' : 'Create Account'}
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </form>
+
+                      <div className="text-center text-xs">
+                        <span className="text-art-olive">Already have an account? </span>
+                        <button
+                          type="button"
+                          onClick={() => { setAuthMode('login'); setAuthError(''); }}
+                          className="text-art-dark font-black hover:underline cursor-pointer"
+                        >
+                          Log In
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MAIN LOGIN SCREEN */}
+                  {authMode === 'login' && (
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className="text-3xl font-serif italic font-bold text-art-dark">Let's Get Started</h2>
+                        <p className="text-xs text-art-olive mt-1 font-medium font-display">Provide your credentials or launch an instant Sandbox session.</p>
+                      </div>
+
+                      <form onSubmit={handleSignIn} className="space-y-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-art-dark block">Email Address:</label>
+                          <div className="relative">
+                            <input
+                              type="email"
+                              placeholder="xyz@gmail.com"
+                              value={loginEmail}
+                              onChange={(e) => setLoginEmail(e.target.value)}
+                              className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3.5 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                              required
+                            />
+                            <Mail className="absolute left-3.5 top-4 w-4 h-4 text-art-olive/60" />
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between items-center">
+                            <label className="text-xs font-bold text-art-dark block">Security Password:</label>
+                            <button
+                              type="button"
+                              onClick={() => { setAuthMode('forgot'); setAuthError(''); }}
+                              className="text-[10px] text-art-olive hover:text-art-dark hover:underline font-bold"
+                            >
+                              Forgot Password?
+                            </button>
+                          </div>
+                          <div className="relative">
+                            <input
+                              type="password"
+                              placeholder="••••••••"
+                              value={loginPassword}
+                              onChange={(e) => setLoginPassword(e.target.value)}
+                              className="w-full bg-art-cream/60 border border-art-border rounded-2xl pl-10 pr-4 py-3.5 text-xs focus:ring-2 focus:ring-art-sage/20 focus:border-art-olive text-art-dark focus:outline-none"
+                              required
+                            />
+                            <Lock className="absolute left-3.5 top-4 w-4 h-4 text-art-olive/60" />
+                          </div>
+                        </div>
+
+                        {authError && (
+                          <p className="text-xs text-rose-600 font-semibold">{authError}</p>
+                        )}
+
+                        <button
+                          type="submit"
+                          disabled={isAuthLoading}
+                          className="w-full bg-art-dark hover:bg-art-forest text-white rounded-2xl py-3.5 text-xs font-bold shadow-md flex items-center justify-center gap-1.5 cursor-pointer transition-all hover:translate-y-[-1px] disabled:opacity-50"
+                        >
+                          {isAuthLoading ? 'Authenticating securely...' : 'Secure Auth Check'}
+                          <ArrowRight className="w-4 h-4" />
+                        </button>
+                      </form>
+
+                      <div className="relative flex py-2 items-center">
+                        <div className="flex-grow border-t border-art-border"></div>
+                        <span className="flex-shrink mx-4 text-[10px] text-art-olive uppercase font-mono font-black">Or Sandbox</span>
+                        <div className="flex-grow border-t border-art-border"></div>
+                      </div>
+
+                      {/* Quick Guest Play Button */}
+                      <button
+                        type="button"
+                        onClick={handlePlayGuest}
+                        disabled={isAuthLoading}
+                        className="w-full bg-art-pale hover:bg-art-pale/80 border border-art-border text-art-dark rounded-2xl py-3.5 text-xs font-black flex items-center justify-center gap-2 cursor-pointer transition-all"
+                      >
+                        <Sparkles className="w-4 h-4 text-art-olive fill-art-pale" /> Play Instantly as Guest (Recommended)
+                      </button>
+
+                      <div className="text-center text-xs pt-1">
+                        <span className="text-art-olive">Don't have an account? </span>
+                        <button
+                          type="button"
+                          onClick={() => { setAuthMode('signup'); setAuthError(''); }}
+                          className="text-art-dark font-black hover:underline cursor-pointer"
+                        >
+                          Join EcoTwin
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
             </div>
 
           </motion.div>

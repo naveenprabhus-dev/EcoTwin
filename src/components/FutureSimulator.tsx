@@ -377,6 +377,12 @@ export default function FutureSimulator({ stats, companionName }: FutureSimulato
                     <span><strong>Commute Shift Impact:</strong> By cycling instead of driving, you avoid approximately <strong>{stats.breakdown.transport} kg CO₂</strong> of vehicular emissions monthly, directly purifying {companionName}'s airspace.</span>
                   </p>
                 )}
+                {transType === 'public' && stats.breakdown.transport > simulatedStats.breakdown.transport && (
+                  <p className="flex items-start gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Green Transit Impact:</strong> Switching to green public transit reduces local urban tailpipe loads, saving around <strong>{Math.round(stats.breakdown.transport - simulatedStats.breakdown.transport)} kg CO₂</strong> monthly over private gasoline SUV use.</span>
+                  </p>
+                )}
                 {diet === 'vegetarian' && stats.breakdown.food > 100 && (
                   <p className="flex items-start gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
@@ -393,6 +399,12 @@ export default function FutureSimulator({ stats, companionName }: FutureSimulato
                   <p className="flex items-start gap-1.5">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
                     <span><strong>Conscious Consumerism:</strong> Buying second-hand clothes or electronics blocks industrial extraction and packaging dispatches, avoiding <strong>{Math.round(stats.breakdown.shopping - 20)} kg CO₂</strong> of shipping.</span>
+                  </p>
+                )}
+                {hasRecycle && stats.breakdown.waste > simulatedStats.breakdown.waste && (
+                  <p className="flex items-start gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Landfill Mitigation:</strong> Separating and composting biodegradable items blocks direct solid organic decomposition at open landfills, mitigating up to <strong>{Math.round(stats.breakdown.waste - simulatedStats.breakdown.waste)} kg CO₂</strong> of greenhouse impact.</span>
                   </p>
                 )}
                 {carbonDiff > 0 ? (

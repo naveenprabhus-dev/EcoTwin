@@ -8,7 +8,7 @@ interface CarbonTwinPetProps {
   name: string;
   moodState?: 'feed' | 'dance' | 'idle' | 'petted';
   isSpeaking?: boolean;
-  currentMood?: 'excited' | 'proud' | 'concerned' | 'sad' | 'motivational' | 'playful';
+  currentMood?: 'excited' | 'proud' | 'concerned' | 'sad' | 'motivational' | 'playful' | 'reflective' | 'celebratory' | 'curious';
 }
 
 export default function CarbonTwinPet({ score, equippedAccessories, name, moodState = 'idle', isSpeaking = false, currentMood }: CarbonTwinPetProps) {
@@ -28,10 +28,14 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
 
   // Determine standard companion mood if not specified
   const effectiveMood = currentMood || (
-    score >= 80 ? 'excited' :
-    score >= 63 ? 'proud' :
-    score >= 48 ? 'playful' :
-    score >= 28 ? 'concerned' : 'sad'
+    score >= 85 ? 'excited' :
+    score >= 76 ? 'celebratory' :
+    score >= 65 ? 'proud' :
+    score >= 55 ? 'curious' :
+    score >= 45 ? 'playful' :
+    score >= 35 ? 'reflective' :
+    score >= 25 ? 'motivational' :
+    score >= 15 ? 'concerned' : 'sad'
   );
 
   let stateGroup: 'excellent' | 'good' | 'moderate' | 'high' | 'critical' = 'good';
@@ -52,6 +56,15 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
       bgGradient = 'from-emerald-300 via-green-100 to-emerald-400';
       faceAccent = '#15803d';
       break;
+    case 'celebratory':
+      stateGroup = 'excellent';
+      bodyColor = '#d97706'; // Golden orange
+      cheekColor = '#fb7185';
+      moodText = 'Celebratory Cheer!';
+      description = `Hooray! Streak milestone reached. ${name} is leaf-dancing and throwing a mini seed-shover celebration!`;
+      bgGradient = 'from-amber-200 via-yellow-100 to-amber-300';
+      faceAccent = '#78350f';
+      break;
     case 'proud':
       stateGroup = 'good';
       bodyColor = '#10b981'; // Fresh Teal/Green
@@ -60,6 +73,24 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
       description = `You've been showing up and keeping our footprint low. ${name} is feeling secure and proud!`;
       bgGradient = 'from-green-100 via-teal-50 to-emerald-200';
       faceAccent = '#115e59';
+      break;
+    case 'curious':
+      stateGroup = 'good';
+      bodyColor = '#06b6d4'; // Cyan
+      cheekColor = '#a5f3fc';
+      moodText = 'Inquisitive & Curious';
+      description = `Sprout is observing daily composting options! ${name} wants to know what other sustainable swaps can be made.`;
+      bgGradient = 'from-cyan-100 via-teal-50 to-cyan-200';
+      faceAccent = '#0e7490';
+      break;
+    case 'reflective':
+      stateGroup = 'moderate';
+      bodyColor = '#64748b'; // Slate Gray
+      cheekColor = '#cbd5e1';
+      moodText = 'Quietly Reflective';
+      description = `Evaluating historical footprint trends. Let's think deeply about how we can manage standby loads.`;
+      bgGradient = 'from-slate-100 via-stone-100 to-indigo-50';
+      faceAccent = '#334155';
       break;
     case 'concerned':
       stateGroup = 'high';

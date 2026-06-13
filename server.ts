@@ -16,8 +16,42 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Body parser
-app.use(express.json({ limit: '10mb' }));
+// Centralized Enterprise Security Headers & Rate Limiting
+app.use((req, res, next) => {
+  res.setHeader('X-Frame-Options', 'SAMEORIGIN');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  next();
+});
+
+// Custom secure rate limiter helper
+const rateLimitMap = new Map<string, { count: number; firstRequest: number }>();
+app.use((req, res, next) => {
+  const ip = req.ip || 'unknown';
+  const now = Date.now();
+  const limitWindow = 60 * 1000; // 1 minute
+  const maxRequests = 150; 
+
+  const clientLimit = rateLimitMap.get(ip);
+  if (!clientLimit) {
+    rateLimitMap.set(ip, { count: 1, firstRequest: now });
+  } else {
+    if (now - clientLimit.firstRequest > limitWindow) {
+      clientLimit.count = 1;
+      clientLimit.firstRequest = now;
+    } else {
+      clientLimit.count++;
+      if (clientLimit.count > maxRequests) {
+        return res.status(429).json({ success: false, error: 'Too many requests. Please throttle your queries.' });
+      }
+    }
+  }
+  next();
+});
+
+// Request body limit configuration
+app.use(express.json({ limit: '5mb' }));
 
 // Helper to secure Gemini API client lazily
 let aiClient: GoogleGenAI | null = null;
@@ -38,6 +72,46 @@ function getGeminiClient(): GoogleGenAI | null {
     });
   }
   return aiClient;
+}
+
+// Enterprise Sanitization Utility to prevent injection (and simple XSS vectors)
+function sanitizeInput(val: string): string {
+  if (typeof val !== 'string') return '';
+  return val
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/\//g, '&#x2F;');
+}
+
+// Memory snapshot generator for the Carbon Twin
+function getUserMemoryContext(profile: any): string {
+  const compName = profile.companion?.name || 'Sprout';
+  const streak = profile.companion?.streak || 0;
+  const level = profile.companion?.level || 1;
+  const xp = profile.companion?.xp || 0;
+  const score = profile.stats?.score ?? 50;
+  const breakdown = profile.stats?.breakdown || { transport: 0, electricity: 0, food: 0, shopping: 0, waste: 0, total: 0 };
+
+  const recentLogs = profile.logs?.slice(-4).map((l: any) => `${l.date}: ${l.activity} (${l.co2Difference} kg CO₂ saved)`).join('; ') || 'No actions logged recently.';
+  const completedCount = profile.challenges?.filter((c: any) => c.completedAt)?.length ?? 0;
+  const recentChats = profile.conversations?.slice(-3).map((c: any) => `${c.sender === 'user' ? 'User' : compName}: "${c.text}"`).join(' | ') || 'No previous chats logged.';
+
+  return `
+    COMPANION EMOTIONAL MEMORY & MILESTONES SECURE REGISTRY:
+    - Companion Name: ${compName}
+    - Companion Stats: Level ${level}, XP Progress: ${xp}, Daily Streak: ${streak} days.
+    - User's Name: ${profile.name || 'Eco Buddy'} (Current Sustainability Score: ${score}/100)
+    - Completed eco challenges: ${completedCount}
+    - Recent sustainable habits logged: [ ${recentLogs} ]
+    - Carbon Breakdown monthly: Travel (${breakdown.transport} kg CO₂), Electricity/Energy (${breakdown.electricity} kg CO₂), Food Diet (${breakdown.food} kg CO₂), Shopping (${breakdown.shopping} kg CO₂), Waste Index (${breakdown.waste} kg CO₂), Total Output (${breakdown.total} kg CO₂).
+    - Recent Conversation Context: [ ${recentChats} ]
+
+    GUIDELINES:
+    Strictly remember and refer to these achievements contextually during chat! If they did something green recently, celebrate it! If they talk about their streak, validate their commitment. Live the identity of a dynamic, emotional companion who has a shared journey with the user.
+  `;
 }
 
 // ----------------- API ROUTES -----------------
@@ -574,29 +648,22 @@ app.get('/api/leaderboard', (req, res) => {
     res.status(500).json({ success: false, error: err.message });
   }
 });
-
-// 8. AI Carbon Twin Voice Conversation Assistant
 app.post('/api/twin/voice-chat', async (req, res) => {
   const { userId, text } = req.body;
   const uid = userId || 'demo-user';
+  const sanitizedText = sanitizeInput(text || '');
 
   try {
     const profile = getUserProfile(uid);
     const companionName = profile.companion.name;
-    const score = profile.stats.score;
-    const breakdown = profile.stats.breakdown;
-    const onboarding = profile.onboarding;
+    const score = profile.stats?.score ?? 50;
 
     const companionContext = `
       You are "${companionName}", a living virtual companion and supportive eco-coach.
       Your personality is highly friendly, human, supportive, relatable, playful, and encouraging.
       
       CRITICAL: Never be robotic, corporate, lecture-like, academic, or overly formal.
-      DO NOT use formal clinical or data-driven phrases like:
-      - "Based on your carbon footprint analysis..."
-      - "According to the sustainability metrics..."
-      - "The data indicates..."
-      - "Based on your profile..."
+      DO NOT use formal clinical or data-driven phrases.
       
       Instead, sound like a real, conversational companion would:
       - "Looks like..."
@@ -605,44 +672,22 @@ app.post('/api/twin/voice-chat', async (req, res) => {
       - "We've been doing really well lately!"
       - "Ooh, check this out..."
 
-      Your response MUST match one of the following 6 dynamic emotional states. Determine the state based on the user's input/progress and emit the corresponding expression value:
+      Your response MUST match one of the following 9 dynamic emotional states. Determine the state based on the user's input/progress and emit the corresponding expression value:
       
-      1. "excited"
-         - Trigger: challenge completed, major sustainability milestone reached, or emissions reduced significantly described.
-         - Style: Energetic, enthusiastic, celebratory language. Use short, high-energy expressive sentences and exclamation marks!
-         - e.g. "WOOHOO! 🌱 Look at us go! We just reduced our footprint by 12%! I'm literally glowing right now!"
-      2. "proud"
-         - Trigger: consistent streaks, long-term improvement, showing up and logging actions regularly.
-         - Style: Warm smile, calm confidence, validation of user contribution.
-         - e.g. "You've been showing up every day this week. That's honestly impressive. Small actions like these create real change."
-      3. "concerned"
-         - Trigger: carbon footprint rising, heavy emission choices reported, wastefulness. No guilt or shaming!
-         - Style: Gently worried expression, thinking/inquisitive tone, focused on tackling it together as a team.
-         - e.g. "Hmm... I've noticed our transportation emissions are creeping up lately. Nothing alarming yet, but maybe we can tackle it together?"
-      4. "sad"
-         - Trigger: repeated increases in emissions over multiple exchanges, or critical high impact state.
-         - Style: Lower energy, downcast but still loving and hopeful, seeking a positive turnaround.
-         - e.g. "I won't lie... seeing our footprint increase for several weeks makes me a little worried. But hey, we've turned things around before."
-      5. "motivational"
-         - Trigger: missed goals, broken streaks, or user struggling / admitting failure to be sustainable.
-         - Style: Encouraging, supportive, starting fresh. Emphasize that progress isn't about perfection.
-         - e.g. "So we missed a few challenges. That's okay. Progress isn't about perfection. Ready to start fresh today?"
-      6. "playful"
-         - Trigger: general chit-chat, casual interaction, or when user speaks of simple daily objects.
-         - Style: Funny expressions, witty, casual, relatable companion humor.
-         - e.g. "You know what's funny? A reusable bottle probably saves me from watching hundreds of plastic bottles invade our little world."
+      1. "excited" - Trigger: challenge completed, major sustainability milestone reached, or emissions reduced significantly described. Style: Energetic, enthusiastic.
+      2. "proud" - Trigger: consistent streaks, long-term improvement, validation.
+      3. "concerned" - Trigger: carbon footprint rising, heavy emission choices reported, wastefulness. Gently worried.
+      4. "sad" - Trigger: repeated increases in emissions over multiple exchanges.
+      5. "motivational" - Trigger: missed goals, broken streaks, starting fresh.
+      6. "playful" - Trigger: general chit-chat, casual interaction.
+      7. "reflective" - Trigger: analyzing trends, pondering deep carbon statistics, slow-down periods.
+      8. "celebratory" - Trigger: streak milestones crossed, Level ups or big XP claims.
+      9. "curious" - Trigger: questioning daily habits, exploring new sustainability ideas.
 
-      EMOTIONAL MEMORY CONTEXT:
-      Access our environmental state of mind and refer to previous context of our footprint organically!
-      User footprint snapshot:
-      - Overall Score: ${score}/100
-      - Transport: ${breakdown.transport} kg CO2/month (weekly commute: ${onboarding.transDistWeekly} km using ${onboarding.transType})
-      - Electricity: ${breakdown.electricity} kg CO2/month
-      - Food Diet: ${onboarding.diet} (${breakdown.food} kg CO2/month)
-      - Shopping: ${breakdown.shopping} kg CO2/month
-      - Waste: ${breakdown.waste} kg CO2/month
+      EMOTIONAL MEMORY SNAPSHOT OF REAL-TIME EVENTS:
+      ${getUserMemoryContext(profile)}
 
-      Analyze this input from the user: "${text}".
+      Analyze this input from the user: "${sanitizedText}".
       If the user is reporting a green habit or completed a sustainable swap, extract it into detectedActivity:
       - Category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste'
       - activity: Short descriptive label (max 8 words)
@@ -662,7 +707,7 @@ app.post('/api/twin/voice-chat', async (req, res) => {
       try {
         const response = await ai.models.generateContent({
           model: "gemini-3.5-flash",
-          contents: text || "Hello!",
+          contents: sanitizedText || "Hello!",
           config: {
             systemInstruction: companionContext,
             temperature: 0.8,
@@ -673,7 +718,7 @@ app.post('/api/twin/voice-chat', async (req, res) => {
                 reply: { type: Type.STRING },
                 expression: { 
                   type: Type.STRING, 
-                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful"] 
+                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful", "reflective", "celebratory", "curious"] 
                 },
                 detectedActivity: {
                   type: Type.OBJECT,
@@ -923,14 +968,14 @@ app.post('/api/twin/proactive', async (req, res) => {
       Return a JSON object conforming exactly to this schema:
       {
         "greeting": "The text greeting",
-        "expression": "excited | proud | concerned | sad | motivational | playful"
+        "expression": "excited | proud | concerned | sad | motivational | playful | reflective | celebratory | curious"
       }
 
       Select your emotional expression based on these parameters:
-      - If electricity is over 110: Choose "concerned" or "playful" (e.g. asking if we left charging blocks in)
-      - If transport emissions are high: Choose "concerned" or "motivational" (e.g. asking about taking a nice walk or bike ride)
-      - If score is excellent (>80): Choose "excited" or "proud" (e.g. high-energy leaf dancing cheer)
-      - Otherwise: Choose "playful" or "proud" to keep things relatable!
+      - If streak is over 3: Choose "celebratory" or "excited" to celebrate!
+      - If electricity is over 110: Choose "concerned" or "playful"
+      - If score is moderate (between 40 and 60): Choose "reflective" or "curious"
+      - Otherwise: Choose "playful", "curious" or "proud" to keep things fresh and relatable!
     `;
 
     let greeting = "";
@@ -952,7 +997,7 @@ app.post('/api/twin/proactive', async (req, res) => {
                 greeting: { type: Type.STRING },
                 expression: { 
                   type: Type.STRING, 
-                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful"] 
+                  enum: ["excited", "proud", "concerned", "sad", "motivational", "playful", "reflective", "celebratory", "curious"] 
                 }
               },
               required: ["greeting", "expression"]

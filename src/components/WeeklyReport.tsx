@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CarbonStats, LoggedEntry } from '../types';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 import { 
   FileText, Sparkles, AlertCircle, ArrowRight, 
-  Calendar, Award, Flame, Lightbulb, Compass, Loader2, PlaySquare 
+  Calendar, Award, Flame, Lightbulb, Compass, Loader2, PlaySquare,
+  Volume2, VolumeX
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -28,6 +29,52 @@ export default function WeeklyReport({ userId, stats, logs, companionName }: Wee
   const [isGenerating, setIsGenerating] = useState(false);
   const [report, setReport] = useState<ReportData | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+
+  const speakReport = () => {
+    if (!report) return;
+    if (isSpeaking) {
+      window.speechSynthesis.cancel();
+      setIsSpeaking(false);
+      return;
+    }
+
+    const textPayload = `
+      Weekly Sustainability Report for Sprout Companion. 
+      Performance Grade achieved is: ${report.grade}. 
+      Summary: ${report.summary}. 
+      Top achievements reached: ${report.achievements.join('. ')}. 
+      Recommendations: ${report.recommendations.join('. ')}. 
+      Outlook Projections: ${report.futureProjections}
+    `;
+
+    const utterance = new SpeechSynthesisUtterance(textPayload);
+    const storedVoice = localStorage.getItem('selected_voice_uri');
+    const storedPitch = parseFloat(localStorage.getItem('selected_pitch') || '1');
+    const storedRate = parseFloat(localStorage.getItem('selected_rate') || '1');
+
+    if (storedVoice) {
+      const allVoices = window.speechSynthesis.getVoices();
+      const activeVoice = allVoices.find(v => v.voiceURI === storedVoice);
+      if (activeVoice) {
+        utterance.voice = activeVoice;
+      }
+    }
+    utterance.pitch = storedPitch;
+    utterance.rate = storedRate;
+
+    utterance.onend = () => setIsSpeaking(false);
+    utterance.onerror = () => setIsSpeaking(false);
+
+    setIsSpeaking(true);
+    window.speechSynthesis.speak(utterance);
+  };
+
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
 
   const fetchAiReport = async () => {
     setIsGenerating(true);
@@ -148,8 +195,26 @@ export default function WeeklyReport({ userId, stats, logs, companionName }: Wee
 
               {/* Summary description */}
               <div className="bg-white border-2 border-art-dark rounded-[24px] p-6 space-y-3">
-                <h3 className="text-xs font-mono font-semibold uppercase text-art-dark tracking-wider flex items-center gap-1.5 border-b border-art-border pb-2.5">
-                  <Flame className="w-4 h-4 text-orange-600" /> Strategic Summary
+                <h3 className="text-xs font-mono font-semibold uppercase text-art-dark tracking-wider flex items-center justify-between border-b border-art-border pb-2.5">
+                  <span className="flex items-center gap-1.5"><Flame className="w-4 h-4 text-orange-600" /> Strategic Summary</span>
+                  {report && (
+                    <button
+                      onClick={speakReport}
+                      type="button"
+                      aria-label={isSpeaking ? 'Cancel narration' : 'Hear audio report narration'}
+                      className="px-2.5 py-1 text-[10px] bg-art-cream text-art-olive border border-art-border rounded-lg hover:bg-art-pale hover:text-art-dark flex items-center gap-1 transition-all cursor-pointer font-bold"
+                    >
+                      {isSpeaking ? (
+                        <>
+                          <VolumeX className="w-3.5 h-3.5 text-rose-600 shrink-0 animate-pulse" /> Halt Audio
+                        </>
+                      ) : (
+                        <>
+                          <Volume2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" /> Narrate Report
+                        </>
+                      )}
+                    </button>
+                  )}
                 </h3>
                 <p className="text-xs text-slate-700 leading-relaxed font-semibold">
                   {report.summary}

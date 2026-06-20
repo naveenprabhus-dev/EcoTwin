@@ -1,0 +1,98 @@
+{
+  "users": {
+    "usr_0.8134045214039618": {
+      "userId": "usr_0.8134045214039618",
+      "email": "hero@ecotwin.com",
+      "name": "hero",
+      "onboarded": false,
+      "onboarding": {
+        "transType": "public",
+        "transDistWeekly": 50,
+        "monthlyElectricBill": 3500,
+        "acUsage": "medium",
+        "diet": "vegetarian",
+        "shopFreq": "weekly",
+        "fastFashion": false,
+        "recycleHabits": "partial",
+        "wasteSegregation": true
+      },
+      "companion": {
+        "name": "Sprout",
+        "level": 1,
+        "xp": 0,
+        "xpNeeded": 100,
+        "streak": 0,
+        "equippedAccessories": [],
+        "unlockedAccessories": []
+      },
+      "challenges": [],
+      "logs": [],
+      "stats": {
+        "score": 77,
+        "breakdown": {
+          "transport": 11,
+          "electricity": 235,
+          "food": 80,
+          "shopping": 80,
+          "waste": 20,
+          "total": 426
+        },
+        "dailyAverage": 14,
+        "monthlyAverage": 426,
+        "annualAverage": 5.1,
+        "treesEquivalent": 233,
+        "carbonSavedThisMonth": 45
+      },
+      "conversations": [],
+      "twin_state": [],
+      "sustainability_scores": []
+    },
+    "usr-classic": {
+      "userId": "usr-classic",
+      "email": "classic@ecotwin.com",
+      "name": "Updated Classic",
+      "onboarded": false,
+      "onboarding": {
+        "transType": "public",
+        "transDistWeekly": 50,
+        "monthlyElectricBill": 3500,
+        "acUsage": "medium",
+        "diet": "vegetarian",
+        "shopFreq": "weekly",
+        "fastFashion": false,
+        "recycleHabits": "partial",
+        "wasteSegregation": true
+      },
+      "companion": {
+        "name": "Sprout",
+        "level": 4,
+        "xp": 0,
+        "xpNeeded": 100,
+        "streak": 0,
+        "equippedAccessories": [],
+        "unlockedAccessories": []
+      },
+      "challenges": [],
+      "logs": [],
+      "stats": {
+        "score": 77,
+        "breakdown": {
+          "transport": 11,
+          "electricity": 235,
+          "food": 80,
+          "shopping": 80,
+          "waste": 20,
+          "total": 426
+        },
+        "dailyAverage": 14,
+        "monthlyAverage": 426,
+        "annualAverage": 5.1,
+        "treesEquivalent": 233,
+        "carbonSavedThisMonth": 45
+      },
+      "conversations": [],
+      "twin_state": [],
+      "sustainability_scores": []
+    }
+  }
+}

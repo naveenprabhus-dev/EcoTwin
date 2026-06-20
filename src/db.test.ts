@@ -24,8 +24,8 @@ describe('calculateCarbonStats', () => {
     // Transport monthly estimate: 50 * 4.3 * 0.05 = 10.75 -> approx 11
     expect(stats.breakdown.transport).toBe(11);
     
-    // Electricity monthly estimate: 80 * 5 * 0.4 = 160. AC medium: 75
-    expect(stats.breakdown.electricity).toBe(235);
+    // Electricity monthly estimate: 80 * 0.114 * 0.4 = 3.648 -> approx 4. AC medium: 75
+    expect(stats.breakdown.electricity).toBe(79);
   });
 
   it('grades strict walking and bicycle diets higher than car driving and heavy eating habits', () => {

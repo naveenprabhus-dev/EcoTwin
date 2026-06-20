@@ -117,7 +117,7 @@ describe('CarbonTwinPet Component State Transitions', () => {
     );
 
     // Assert that the theme descriptions and scores match standard expectations
-    expect(screen.getByText('Radiant & Thriving!')).toBeInTheDocument();
+    expect(screen.getByText('Radiant & Excited!')).toBeInTheDocument();
     expect(screen.getByText(/Sprout is blooming/)).toBeInTheDocument();
   });
 
@@ -131,12 +131,12 @@ describe('CarbonTwinPet Component State Transitions', () => {
       />
     );
 
-    expect(screen.getByText('Severely Sick & Smoggy')).toBeInTheDocument();
-    expect(screen.getByText(/Heavy emissions/i)).toBeInTheDocument();
+    expect(screen.getByText('A Bit Sad & Worried')).toBeInTheDocument();
+    expect(screen.getByText(/emissions have increased/i)).toBeInTheDocument();
   });
 
   it('interacts correctly when interactive sandbox actions are selected', () => {
-    const { container } = render(
+    render(
       <CarbonTwinPet 
         score={72} 
         equippedAccessories={[]} 
@@ -145,8 +145,8 @@ describe('CarbonTwinPet Component State Transitions', () => {
       />
     );
 
-    // Visual pet component displays healthy description
-    expect(screen.getByText('Feeling Great & Healthy!')).toBeInTheDocument();
+    // Visual pet component displays healthy description for proud state (score 72)
+    expect(screen.getByText('Thriving & Proud!')).toBeInTheDocument();
   });
 });
 

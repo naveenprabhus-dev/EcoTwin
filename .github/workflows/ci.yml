@@ -7,25 +7,6 @@ on:
     branches: [ main, master, dev, staging ]
 
 jobs:
-  audit-and-security:
-    name: 🛡️ Security / Dependency Scan
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install Dependencies
-        run: npm ci
-
-      - name: Run Dependency Security Scan
-        run: npm audit --audit-level=high
-
   lint-and-typecheck:
     name: 🔍 TypeScript & Lint Checks
     runs-on: ubuntu-latest

@@ -101,6 +101,27 @@ export interface SustainabilityScoreLog {
   dateTime: string;
 }
 
+export interface ActionPlanTask {
+  id: string;
+  day: number;
+  title: string;
+  description: string;
+  category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste';
+  co2Reduction: number;
+  difficulty: 'easy' | 'medium' | 'hard';
+  impact: 'low' | 'medium' | 'high';
+  completed: boolean;
+  completedAt?: string | null;
+}
+
+export interface ActionPlan {
+  createdAt: string;
+  tasks: ActionPlanTask[];
+  currentDay: number;
+  complianceRate: number;
+  weeklyReflection?: string | null;
+}
+
 export interface UserProfile {
   userId: string;
   email: string;
@@ -114,4 +135,5 @@ export interface UserProfile {
   conversations?: ConversationLog[];
   twin_state?: TwinStateLog[];
   sustainability_scores?: SustainabilityScoreLog[];
+  actionPlan?: ActionPlan;
 }

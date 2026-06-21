@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { CarbonStats, LoggedEntry } from '../types';
+import React, { useState, useEffect } from 'react';
+import { CarbonStats, LoggedEntry, ActionPlan } from '../types';
 import { 
   ResponsiveContainer, PieChart, Pie, Cell, 
   BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
@@ -17,11 +17,32 @@ interface DashboardProps {
   stats: CarbonStats;
   logs: LoggedEntry[];
   onAddCustomEntry: (category: any, activity: string, co2: number, xp: number) => void;
+  userId?: string;
 }
 
-export default function Dashboard({ stats, logs, onAddCustomEntry }: DashboardProps) {
+export default function Dashboard({ stats, logs, onAddCustomEntry, userId }: DashboardProps) {
   const [filterCategory, setFilterCategory] = useState<string>('all');
   const [showAddLog, setShowAddLog] = useState(false);
+  const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchPlanData = async () => {
+      try {
+        const res = await fetch(`/api/action-planner?userId=${userId || 'demo-user'}`);
+        const data = await res.json();
+        if (data.success && active) {
+          setActionPlan(data.actionPlan);
+        }
+      } catch (e) {
+        console.error("Dashboard failed to fetch action plan:", e);
+      }
+    };
+    fetchPlanData();
+    return () => {
+      active = false;
+    };
+  }, [userId, logs]);
   
   // Custom Log Form State
   const [customAct, setCustomAct] = useState('');
@@ -295,6 +316,88 @@ export default function Dashboard({ stats, logs, onAddCustomEntry }: DashboardPr
         </div>
 
       </div>
+
+      {/* 🌱 My Action Plan Integrated Widget */}
+      {actionPlan && actionPlan.tasks && (
+        <div id="dashboard-action-plan" className="bg-white rounded-[32px] p-6 border border-art-border shadow-xs">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-5 pb-3 border-b border-art-border">
+            <div>
+              <h3 className="text-xl font-serif italic font-bold text-art-dark flex items-center gap-2">
+                🌱 My Action Plan
+              </h3>
+              <p className="text-xs text-art-olive mt-0.5 font-semibold">Track your daily action recommendations and compliance history directly from your dashboard.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 font-mono text-xs font-bold text-slate-700">
+              <span className="text-emerald-700 bg-emerald-50 border border-emerald-100 px-2.5 py-1 rounded-full uppercase">
+                Progress: {actionPlan.tasks.filter(t => t.completed).length} / 7 Completed
+              </span>
+              <span className="text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full uppercase">
+                Expected Plan Impact: -{actionPlan.tasks.reduce((acc, t) => acc + t.co2Reduction, 0).toFixed(1)} kg CO₂
+              </span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+            {/* Today's Action Spotlight */}
+            <div className="lg:col-span-5 bg-gradient-to-br from-emerald-50/70 to-teal-50/30 p-5 rounded-2xl border border-emerald-100 flex flex-col justify-between">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-black bg-emerald-600 text-white px-2 py-0.5 rounded uppercase">Today's Highlight</span>
+                  <span className="text-[10px] font-black text-emerald-800 uppercase">Day {actionPlan.currentDay || 1} Target</span>
+                </div>
+                {(() => {
+                  const todayTask = actionPlan.tasks.find(t => t.day === (actionPlan.currentDay || 1)) || actionPlan.tasks[0];
+                  if (!todayTask) return <p className="text-xs italic text-slate-500">Plan is complete! Adapt next week's schedule above.</p>;
+                  return (
+                    <div className="space-y-2">
+                      <h4 className="font-serif italic font-extrabold text-art-dark text-base">{todayTask.title}</h4>
+                      <p className="text-xs text-slate-650 font-semibold leading-relaxed">{todayTask.description}</p>
+                      <div className="flex items-center justify-between pt-1 font-mono text-[10px] font-black uppercase text-slate-600">
+                        <span className="text-amber-700">Difficulty: {todayTask.difficulty}</span>
+                        <span className="text-emerald-700">-{todayTask.co2Reduction} kg CO₂</span>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="pt-4 border-t border-emerald-100 mt-4 text-[10px] text-emerald-800 font-semibold italic flex items-center gap-1.5">
+                <span>🦖</span>
+                <span>Complete this action to feed Sprout and watch your rating hit new highs!</span>
+              </div>
+            </div>
+
+            {/* Checklist Progress Grid */}
+            <div className="lg:col-span-7 flex flex-col justify-between">
+              <div>
+                <span className="text-[10px] font-black tracking-wider uppercase text-slate-400 block mb-2.5">7-Day Task Breakdown Checklist:</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                  {actionPlan.tasks.map((task) => {
+                    return (
+                      <div key={task.id} className="flex items-center justify-between p-2.5 bg-slate-50 border border-slate-150 rounded-xl transition-all hover:bg-slate-100">
+                        <div className="flex items-center gap-2 shrink-0">
+                          {task.completed ? (
+                            <div className="w-5 h-5 rounded-full bg-emerald-100 flex items-center justify-center border border-emerald-300 shrink-0">
+                              <span className="text-[10px] text-emerald-600 font-black">✓</span>
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded-full border border-slate-300 bg-white shrink-0" />
+                          )}
+                          <div className="font-semibold text-slate-800 leading-tight">
+                            <span className="font-mono text-[9px] text-slate-400 mr-1.5 font-bold uppercase block md:inline">Day {task.day}</span>
+                            <span className="text-slate-700 align-middle font-bold text-[11px]">{task.title}</span>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black text-slate-500 ml-2 font-mono">-{task.co2Reduction}kg</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Low list row: Logged sustainable actions */}
       <div className="bg-white rounded-[32px] p-6 border border-art-border shadow-xs">

@@ -9,6 +9,7 @@ import {
   getLeaderboard, 
   DEFAULT_CHALLENGES 
 } from './server/db';
+import { UserProfile, ActionPlan, ActionPlanTask } from './src/types';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -1546,6 +1547,412 @@ app.post('/api/weekly-report', async (req, res) => {
     res.json({ success: true, report: reportData });
   } catch (err: any) {
     console.error("Failed to generate weekly sustainability report:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+
+// ----------------- ECOBUDDY ADAPTIVE ACTION PLANNER ENDPOINTS -----------------
+
+// Offline adaptive action planner helper generator
+function generateOfflineActionPlan(profile: UserProfile): ActionPlanTask[] {
+  const breakdown = profile.stats.breakdown;
+  const cats: Array<{cat: 'transport' | 'energy' | 'food' | 'shopping' | 'waste', val: number}> = [
+    { cat: 'transport', val: breakdown.transport },
+    { cat: 'energy', val: breakdown.electricity },
+    { cat: 'food', val: breakdown.food },
+    { cat: 'shopping', val: breakdown.shopping },
+    { cat: 'waste', val: breakdown.waste }
+  ];
+  cats.sort((a, b) => b.val - a.val);
+
+  const taskTemplates = {
+    transport: [
+      { title: 'Walk for short errands', description: 'Walk instead of driving for any trip under 1 km.', co2Reduction: 1.5, difficulty: 'easy', impact: 'low' },
+      { title: 'Take public transit', description: 'Use a train, bus, or subway for your primary commute today.', co2Reduction: 4.8, difficulty: 'medium', impact: 'medium' },
+      { title: 'Go completely vehicle-free', description: 'Power your commute entirely by biking or walking.', co2Reduction: 8.5, difficulty: 'hard', impact: 'high' }
+    ],
+    energy: [
+      { title: 'Unplug vampire devices', description: 'Disconnect unused chargers and idle laptop plug blocks today.', co2Reduction: 1.1, difficulty: 'easy', impact: 'low' },
+      { title: 'AC temperature control', description: 'Increase your climate AC node to 25°C or turn it off for 3 hours.', co2Reduction: 2.8, difficulty: 'medium', impact: 'medium' },
+      { title: 'Power down all screens', description: 'Unplug stand-by systems and shut down high-intensity screens for 4 hours.', co2Reduction: 5.5, difficulty: 'hard', impact: 'high' }
+    ],
+    food: [
+      { title: 'Enjoy a poultry/bean swap', description: 'Substitute resource-heavy red beef/pork with clean chicken or beans.', co2Reduction: 2.2, difficulty: 'easy', impact: 'medium' },
+      { title: 'Have a plant-based lunch', description: 'Avoid meat or resource-intensive dairy options during your midday meal.', co2Reduction: 3.5, difficulty: 'medium', impact: 'medium' },
+      { title: 'Green carbon meal day', description: 'Adopt 100% plant-based organic regional grid sources for the whole day.', co2Reduction: 5.8, difficulty: 'hard', impact: 'high' }
+    ],
+    shopping: [
+      { title: 'Decline single-use delivery', description: 'Refuse packaging by avoiding instant small shipping delivery drops.', co2Reduction: 1.8, difficulty: 'easy', impact: 'low' },
+      { title: 'Shop second-hand only', description: 'If you must purchase clothes today, choose pre-owned thrift wear.', co2Reduction: 4.5, difficulty: 'medium', impact: 'medium' },
+      { title: 'No shopping day', description: 'Abstain from purchasing any non-grocery or fashion items today.', co2Reduction: 7.5, difficulty: 'hard', impact: 'high' }
+    ],
+    waste: [
+      { title: 'Carry a reusable tumbler', description: 'Avert single-use cup waste by bringing an insulated water bottle.', co2Reduction: 0.8, difficulty: 'easy', impact: 'low' },
+      { title: 'House waste sorting', description: 'Properly segregate wet compost material, dry recyclables, and landfill bins.', co2Reduction: 2.0, difficulty: 'medium', impact: 'medium' },
+      { title: 'Zero organic landfill waste', description: 'Compost every food scrap and vegetable peeling locally today.', co2Reduction: 4.2, difficulty: 'hard', impact: 'high' }
+    ]
+  };
+
+  const selectedTasks: ActionPlanTask[] = [];
+  const prevPlan = profile.actionPlan;
+  const isAdaptive = !!prevPlan;
+
+  for (let day = 1; day <= 7; day++) {
+    let category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste';
+    if (day === 1 || day === 6) category = cats[0].cat;
+    else if (day === 2 || day === 7) category = cats[1].cat;
+    else if (day === 3) category = cats[2].cat;
+    else if (day === 4) category = cats[3].cat;
+    else category = cats[4].cat;
+
+    let difficulty: 'easy' | 'medium' | 'hard' = 'medium';
+    if (day === 1 || day === 3) difficulty = 'easy';
+    else if (day === 5 || day === 6) difficulty = 'hard';
+
+    if (isAdaptive) {
+      const prevCatTasks = prevPlan.tasks.filter(t => t.category === category);
+      const completedCount = prevCatTasks.filter(t => t.completed).length;
+      const totalCount = prevCatTasks.length;
+
+      if (totalCount > 0) {
+        const compliance = completedCount / totalCount;
+        if (compliance >= 0.7) {
+          difficulty = difficulty === 'easy' ? 'medium' : 'hard';
+        } else if (compliance <= 0.3) {
+          difficulty = difficulty === 'hard' ? 'medium' : 'easy';
+        }
+      }
+    }
+
+    const tGroup = taskTemplates[category];
+    const match = tGroup.find(t => t.difficulty === difficulty) || tGroup[1];
+
+    selectedTasks.push({
+      id: `ap_${day}_${Math.random().toString(36).substring(2, 6)}`,
+      day,
+      title: match.title,
+      description: match.description,
+      category,
+      co2Reduction: match.co2Reduction,
+      difficulty: difficulty,
+      impact: match.difficulty === 'easy' ? 'low' : match.difficulty === 'medium' ? 'medium' : 'high',
+      completed: false,
+      completedAt: null
+    });
+  }
+
+  return selectedTasks;
+}
+
+// 12. Retrieve user plan, auto generating a plan if empty
+app.get('/api/action-planner', (req, res) => {
+  const userId = (req.query.userId as string) || 'demo-user';
+  try {
+    const profile = getUserProfile(userId);
+    if (!profile.actionPlan) {
+      const defaultTasks = generateOfflineActionPlan(profile);
+      profile.actionPlan = {
+        createdAt: new Date().toISOString(),
+        tasks: defaultTasks,
+        currentDay: 1,
+        complianceRate: 100,
+        weeklyReflection: null
+      };
+      updateUserProfile(userId, (p) => {
+        p.actionPlan = profile.actionPlan;
+      });
+    }
+    res.json({ success: true, actionPlan: profile.actionPlan });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 13. Adapt & Regenerate 7-day sustainable action plan
+app.post('/api/action-planner/generate', async (req, res) => {
+  const { userId } = req.body;
+  const uid = userId || 'demo-user';
+
+  try {
+    const profile = getUserProfile(uid);
+    const onboarding = profile.onboarding;
+    const breakdown = profile.stats.breakdown;
+    const ai = getGeminiClient();
+
+    let tasks: ActionPlanTask[] = [];
+
+    if (ai) {
+      try {
+        const completedList = profile.actionPlan?.tasks.filter(t => t.completed).map(t => `- ${t.title} (${t.category})`).join('\n') || 'None';
+        const missedList = profile.actionPlan?.tasks.filter(t => !t.completed).map(t => `- ${t.title} (${t.category})`).join('\n') || 'None';
+
+        const prompt = `
+          You are 'EcoBuddy', the supportive virtual companion and sustainability planner.
+          Formulate an action plan of exactly 7 tasks, with exactly one task for each Day (day 1 to 7).
+          Analyze user details:
+          - Travel: ${onboarding.transType} (commutes ${onboarding.transDistWeekly} km weekly)
+          - Diet: ${onboarding.diet}
+          - Household electricity cost index: ${onboarding.monthlyElectricBill}
+          - High emission sectors to minimize: Transport=${breakdown.transport} kg CO2/month, Electricity/Energy=${breakdown.electricity} kg, Food=${breakdown.food} kg, Shopping=${breakdown.shopping} kg, Waste=${breakdown.waste} kg.
+          - Prior completed actions:
+          ${completedList}
+          - Prior missed actions:
+          ${missedList}
+
+          Design a fully personalized 7-day action plan. Suggest 1 practical action for each day covering different categories ('transport', 'energy', 'food', 'shopping', 'waste'). Highlight categories where emissions are heavy, but adapt difficulty (easy/medium/hard) dynamically to help them build comfortable habits.
+
+          Return a JSON structure mimicking exactly this schema:
+          {
+            "tasks": [
+              {
+                "id": "string",
+                "day": 1,
+                "title": "Use public transport for one trip",
+                "description": "Leave your personal car home today and ride a bus or subway.",
+                "category": "transport",
+                "co2Reduction": 5.2,
+                "difficulty": "medium",
+                "impact": "medium",
+                "completed": false
+              }
+            ]
+          }
+          Provide absolutely valid JSON only.
+        `;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                tasks: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      id: { type: Type.STRING },
+                      day: { type: Type.INTEGER },
+                      title: { type: Type.STRING },
+                      description: { type: Type.STRING },
+                      category: { type: Type.STRING, enum: ["transport", "energy", "food", "shopping", "waste"] },
+                      co2Reduction: { type: Type.NUMBER },
+                      difficulty: { type: Type.STRING, enum: ["easy", "medium", "hard"] },
+                      impact: { type: Type.STRING, enum: ["low", "medium", "high"] },
+                      completed: { type: Type.BOOLEAN }
+                    },
+                    required: ["id", "day", "title", "description", "category", "co2Reduction", "difficulty", "impact", "completed"]
+                  }
+                }
+              },
+              required: ["tasks"]
+            }
+          }
+        });
+
+        const parsed = JSON.parse(response.text?.trim() || "{}");
+        if (parsed.tasks && parsed.tasks.length > 0) {
+          tasks = parsed.tasks;
+        }
+      } catch (err) {
+        console.warn("Planner adaptation with Gemini failed/quota limited. Running custom heuristics:", err);
+      }
+    }
+
+    if (tasks.length === 0) {
+      tasks = generateOfflineActionPlan(profile);
+    }
+
+    const updatedPlan: ActionPlan = {
+      createdAt: new Date().toISOString(),
+      tasks,
+      currentDay: 1,
+      complianceRate: 100,
+      weeklyReflection: null
+    };
+
+    updateUserProfile(uid, (p) => {
+      p.actionPlan = updatedPlan;
+    });
+
+    res.json({ success: true, actionPlan: updatedPlan });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 14. Mark a task completed inside user planner checklist
+app.post('/api/action-planner/complete-task', (req, res) => {
+  const { userId, taskId } = req.body;
+  const uid = userId || 'demo-user';
+
+  if (!taskId) {
+    return res.status(400).json({ success: false, error: 'Task ID required' });
+  }
+
+  try {
+    let targetTask: ActionPlanTask | undefined;
+
+    const updatedProfile = updateUserProfile(uid, (profile) => {
+      if (!profile.actionPlan) return;
+      const task = profile.actionPlan.tasks.find(t => t.id === taskId);
+      if (!task || task.completed) return;
+
+      task.completed = true;
+      task.completedAt = new Date().toISOString();
+      targetTask = task;
+
+      // Reward companion with XP
+      const xpReward = 30;
+      profile.companion.xp += xpReward;
+      profile.companion.streak = (profile.companion.streak || 0) + 1;
+
+      // Handle companion leveling up
+      while (profile.companion.xp >= profile.companion.xpNeeded) {
+        profile.companion.xp -= profile.companion.xpNeeded;
+        profile.companion.level += 1;
+        profile.companion.xpNeeded = Math.round(profile.companion.xpNeeded * 1.5);
+        
+        const rewards = ['Eco Crown', 'Monocles', 'Golden Cloak', 'Cute Mini Pet'];
+        const rewardItem = rewards[(profile.companion.level - 2) % rewards.length];
+        if (!profile.companion.unlockedAccessories.includes(rewardItem)) {
+          profile.companion.unlockedAccessories.push(rewardItem);
+        }
+      }
+
+      // Add a clean sustainability log
+      const logId = Math.random().toString(36).substring(2);
+      const newLog = {
+        id: logId,
+        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        category: task.category,
+        activity: `Plan Action: ${task.title}`,
+        co2Difference: -Math.abs(task.co2Reduction),
+        xpReward: xpReward
+      };
+      profile.logs = [newLog, ...profile.logs];
+
+      // Update sustainability carbon saved
+      profile.stats.carbonSavedThisMonth = Number((profile.stats.carbonSavedThisMonth + task.co2Reduction).toFixed(1));
+
+      // Re-trigger live carbon score adjustment
+      const baseRecalc = calculateCarbonStats(profile.onboarding);
+      let scoreBonus = 0;
+      if (profile.stats.carbonSavedThisMonth >= 0) {
+        scoreBonus = Math.min(18, Math.floor(profile.stats.carbonSavedThisMonth / 5));
+      } else {
+        scoreBonus = Math.max(-100, Math.floor(profile.stats.carbonSavedThisMonth / 2));
+      }
+      profile.stats.score = Math.min(100, Math.max(0, baseRecalc.score + scoreBonus));
+      profile.stats.breakdown = baseRecalc.breakdown;
+
+      // Maintain Twin State
+      if (!profile.twin_state) profile.twin_state = [];
+      profile.twin_state.push({
+        id: Math.random().toString(36).substring(2),
+        score: profile.stats.score,
+        mood: profile.stats.score >= 80 ? 'Excellent' : profile.stats.score >= 60 ? 'Healthy' : profile.stats.score >= 40 ? 'Moderate' : 'Stressed',
+        expression: 'excited',
+        accessoryCount: profile.companion.equippedAccessories.length,
+        dateTime: new Date().toISOString()
+      });
+      if (profile.twin_state.length > 50) profile.twin_state.shift();
+
+      // Maintain core scores list
+      if (!profile.sustainability_scores) profile.sustainability_scores = [];
+      profile.sustainability_scores.push({
+        id: Math.random().toString(36).substring(2),
+        score: profile.stats.score,
+        dateTime: new Date().toISOString()
+      });
+      if (profile.sustainability_scores.length > 50) profile.sustainability_scores.shift();
+    });
+
+    if (!targetTask) {
+      return res.status(404).json({ success: false, error: 'Task not found or already completed.' });
+    }
+
+    res.json({ success: true, profile: updatedProfile });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 15. Create a progress reflection summary at the end of 7 days
+app.post('/api/action-planner/reflection', async (req, res) => {
+  const { userId } = req.body;
+  const uid = userId || 'demo-user';
+
+  try {
+    const profile = getUserProfile(uid);
+    if (!profile.actionPlan) {
+      return res.status(400).json({ success: false, error: 'No active Action Plan exists' });
+    }
+
+    const tasks = profile.actionPlan.tasks;
+    const completed = tasks.filter(t => t.completed);
+    const missed = tasks.filter(t => !t.completed);
+    const totalCO2Saved = completed.reduce((acc, t) => acc + t.co2Reduction, 0);
+
+    let reflection = "";
+    const ai = getGeminiClient();
+
+    if (ai) {
+      try {
+        const completedText = completed.map(t => `- ${t.title} (${t.category}, co2: ${t.co2Reduction}kg)`).join('\n') || 'None';
+        const missedText = missed.map(t => `- ${t.title} (${t.category})`).join('\n') || 'None';
+
+        const prompt = `
+          You are 'EcoBuddy', the highly encouraging virtual companion.
+          Compile a supportive carbon habit reflection for the user's past 7 days:
+          - Completed tasks:
+          ${completedText}
+          - Missed tasks:
+          ${missedText}
+          - Cumulative CO2 emissions prevented: ${totalCO2Saved} kg
+
+          Write a highly friendly, detailed, structured reflection of 1-2 paragraphs (max 120 words). Format beautifully using markdown. Celebrate their successes and offer gentle, supportive tips on how they can ease into completing missed tasks next cycle.
+        `;
+
+        const response = await ai.models.generateContent({
+          model: "gemini-3.5-flash",
+          contents: prompt,
+          config: {
+            temperature: 0.8
+          }
+        });
+
+        reflection = response.text || "";
+      } catch (err) {
+        console.warn("AI reflection compilation failed/quota exceeded:", err);
+      }
+    }
+
+    if (!reflection) {
+      // High fidelity offline fallback reflection
+      const completedList = completed.map(t => `**${t.title}**`).join(', ');
+      const valStr = totalCO2Saved.toFixed(1);
+
+      if (completed.length === 0) {
+        reflection = `### 🌿 EcoBuddy Carbon Reflection\n\nNo worries! Building new habits takes time. This week, we didn't get to log any completed tasks, but next week is a fresh opportunity to try again. Let's aim to start with an easier task to help Sprout thrive!`;
+      } else {
+        const missedTip = missed.length > 0 ? `\n\nFor the tasks we skipped (such as *${missed[0].title}*), do not stress! We can adjust the difficulty profiles in the next plan so we can build confidence smoothly.` : '';
+        reflection = `### 🌿 EcoBuddy Carbon Reflection\n\nIncredible effort! You logged **${completed.length}** completed eco-habits this week—including **${completedList}**—and saved a grand total of **${valStr} kg** of CO₂! 🥳${missedTip}\n\nKeep it up next cycle to help Sprout level up further!`;
+      }
+    }
+
+    // Save reflection text and update plan status
+    updateUserProfile(uid, (p) => {
+      if (p.actionPlan) {
+        p.actionPlan.weeklyReflection = reflection;
+      }
+    });
+
+    res.json({ success: true, reflection, actionPlan: getUserProfile(uid).actionPlan });
+  } catch (err: any) {
     res.status(500).json({ success: false, error: err.message });
   }
 });

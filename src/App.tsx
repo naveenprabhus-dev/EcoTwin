@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserProfile, OnboardingData } from './types';
 import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
+import ActionPlanner from './components/ActionPlanner';
 import CarbonTwinPet from './components/CarbonTwinPet';
 import AICoach from './components/AICoach';
 import Scanner from './components/Scanner';
@@ -59,7 +60,7 @@ export default function App() {
   const [authError, setAuthError] = useState('');
 
   // Active view states
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'twin' | 'coach' | 'challenges' | 'profile' | 'simulator' | 'reports'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'planner' | 'twin' | 'coach' | 'challenges' | 'profile' | 'simulator' | 'reports'>('dashboard');
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
@@ -1121,6 +1122,7 @@ export default function App() {
             <div className="max-w-7xl mx-auto px-4 md:px-8 flex items-center gap-1 overflow-x-auto select-none scrollbar-none">
               {[
                 { id: 'dashboard', label: '📊 Insights Dashboard' },
+                { id: 'planner', label: '🌱 EcoBuddy Planner' },
                 { id: 'twin', label: `🦖 Virtual Twin Workspace` },
                 { id: 'simulator', label: `🔮 Footprint Simulator` },
                 { id: 'reports', label: `📜 AI Weekly Reports` },
@@ -1161,6 +1163,15 @@ export default function App() {
                     stats={profile.stats} 
                     logs={profile.logs} 
                     onAddCustomEntry={handleLogAction}
+                    userId={profile.userId}
+                  />
+                )}
+
+                {/* A2. ECOBUDDY ADAPTIVE ACTION PLANNER VIEW */}
+                {activeTab === 'planner' && (
+                  <ActionPlanner 
+                    userId={profile.userId}
+                    onRefreshProfile={() => reloadProfileStats()}
                   />
                 )}
 

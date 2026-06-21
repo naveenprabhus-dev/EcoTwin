@@ -11,6 +11,7 @@ import {
   UploadCloud, Loader2, Cpu
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { CarbonEngine } from '../services/CarbonEngine';
 
 interface DashboardProps {
   stats: CarbonStats;
@@ -106,9 +107,19 @@ export default function Dashboard({ stats, logs, onAddCustomEntry }: DashboardPr
         setCustomXp(pred.xpReward.toString());
         setIsAddedEmission(pred.isAddition);
         setPredictedExplanation(pred.explanation);
+      } else {
+        throw new Error('Fallback target');
       }
     } catch (err) {
-      console.error("Failing to grab Carbon predictive response:", err);
+      console.warn("Using offline carbon calculation heuristics:", err);
+      // Fallback prediction via services
+      const pred = CarbonEngine.estimateLogImpact(customAct, !!attachedImageBase64);
+      setCustomAct(pred.activity);
+      setCustomCat(pred.category);
+      setCustomCo2(Math.abs(pred.co2Difference).toFixed(1));
+      setCustomXp(pred.xpReward.toString());
+      setIsAddedEmission(pred.isAddition);
+      setPredictedExplanation(pred.explanation + " (Offline Heuristics Engine)");
     } finally {
       setIsPredicting(false);
     }

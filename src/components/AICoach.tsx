@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, Sparkles, MessageCircle, HelpCircle } from 'lucide-react';
 import { motion } from 'motion/react';
+import { EcoBuddyAssistant } from '../services/EcoBuddyAssistant';
 
 interface Message {
   id: string;
@@ -20,7 +21,7 @@ export default function AICoach({ userId, companionName, score }: AICoachProps) 
     {
       id: 'm1',
       sender: 'ai',
-      text: `Hello! I'm **${companionName}**, your virtual Carbon Companion and Sustainability Coach. 🌿\n\nI can analyze your carbon breakdown, suggest personalized daily optimizations, and answer your ecological Q&As!\n\nWhat would you like to discuss today?`,
+      text: EcoBuddyAssistant.buildInitialGreeting(companionName, score),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     }
   ]);
@@ -78,11 +79,11 @@ export default function AICoach({ userId, companionName, score }: AICoachProps) 
       }
     } catch (err: any) {
       console.error('Failed to communicate with AI Coach:', err);
-      // Fallback response with beautiful markdown tips
+      // Fallback response using central assistant service
       setMessages(prev => [...prev, {
         id: Math.random().toString(36).substring(2),
         sender: 'ai',
-        text: `### 🌿 Environmental Tip\n\nI encountered a brief connection hiccup, but let's talk conservation! Your score is **${score}/100**.\n\n* **Reduce Electricity**: Shutting down appliances saves up to 10% of monthly standby power.\n* **Travel Light**: Walking or cycling inside blocks cuts single-car commute pollutants entirely!\n\nFeel free to retry or ask another question!`,
+        text: EcoBuddyAssistant.getFallbackReply(textToSend, score),
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       }]);
     } finally {
@@ -90,12 +91,7 @@ export default function AICoach({ userId, companionName, score }: AICoachProps) 
     }
   };
 
-  const sampleQuestions = [
-    "How can I reduce my transportation emissions?",
-    "Which foods have the lowest carbon footprints?",
-    "Is cycling better than buses for commute metrics?",
-    "How does segregating waste save atmosphere carbon?"
-  ];
+  const sampleQuestions = EcoBuddyAssistant.SAMPLE_QUESTIONS;
 
   return (
     <div className="w-full max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-12 gap-6 bg-white rounded-[32px] overflow-hidden shadow-xs border border-art-border min-h-[580px]">

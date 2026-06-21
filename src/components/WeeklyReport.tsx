@@ -7,6 +7,8 @@ import {
   Volume2, VolumeX
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { VoiceSystem } from '../services/VoiceSystem';
+import { ReportGenerator } from '../services/ReportGenerator';
 
 interface WeeklyReportProps {
   userId: string;
@@ -34,7 +36,7 @@ export default function WeeklyReport({ userId, stats, logs, companionName }: Wee
   const speakReport = () => {
     if (!report) return;
     if (isSpeaking) {
-      window.speechSynthesis.cancel();
+      VoiceSystem.cancel();
       setIsSpeaking(false);
       return;
     }
@@ -48,31 +50,16 @@ export default function WeeklyReport({ userId, stats, logs, companionName }: Wee
       Outlook Projections: ${report.futureProjections}
     `;
 
-    const utterance = new SpeechSynthesisUtterance(textPayload);
-    const storedVoice = localStorage.getItem('selected_voice_uri');
-    const storedPitch = parseFloat(localStorage.getItem('selected_pitch') || '1');
-    const storedRate = parseFloat(localStorage.getItem('selected_rate') || '1');
-
-    if (storedVoice) {
-      const allVoices = window.speechSynthesis.getVoices();
-      const activeVoice = allVoices.find(v => v.voiceURI === storedVoice);
-      if (activeVoice) {
-        utterance.voice = activeVoice;
-      }
-    }
-    utterance.pitch = storedPitch;
-    utterance.rate = storedRate;
-
-    utterance.onend = () => setIsSpeaking(false);
-    utterance.onerror = () => setIsSpeaking(false);
-
-    setIsSpeaking(true);
-    window.speechSynthesis.speak(utterance);
+    VoiceSystem.speak(textPayload, {
+      onStart: () => setIsSpeaking(true),
+      onEnd: () => setIsSpeaking(false),
+      onError: () => setIsSpeaking(false)
+    });
   };
 
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      VoiceSystem.cancel();
     };
   }, []);
 
@@ -93,24 +80,8 @@ export default function WeeklyReport({ userId, stats, logs, companionName }: Wee
       }
     } catch (err: any) {
       console.error('Report generating failed:', err);
-      // Beautiful fallback mock report with realistic metrics
-      setReport({
-        trend: stats.carbonSavedThisMonth > 10 ? 'down' : 'flat',
-        percentageChange: stats.carbonSavedThisMonth > 10 ? 12 : 3,
-        grade: stats.score >= 80 ? 'A (Conservationist)' : stats.score >= 60 ? 'B+ (Eco Conscious)' : 'C (High Impact)',
-        summary: `Excellent work keeping ${companionName} hydrated! Based on your last 7 days of logs, transportation remains your primary target, while food footprint has remained optimally low.`,
-        achievements: [
-          'Saved 15kg of CO2 by using public transit or cycling inside blocks.',
-          'Completed the "Eat Green, Feel Green" veggie challenge.',
-          'Maintained a healthy 3-day eco logging streak.'
-        ],
-        recommendations: [
-          'Unplug electronic standby items when not in use. This trims baseline electricity spikes by 8%.',
-          'Attempt to commute using public networks 2 times next week to cut transport outputs.',
-          'Try shopping local groceries to reduce freight footprint.'
-        ],
-        futureProjections: `Continuing your current habits would reduce your annual output by around ${Math.round(stats.carbonSavedThisMonth * 12)} kg, leading to an upgraded companion tier next quarter!`
-      });
+      // Beautiful fallback mock report with realistic metrics compiled through ReportGenerator
+      setReport(ReportGenerator.compileLocalFallbackReport(stats, logs, companionName));
     } finally {
       setIsGenerating(false);
     }

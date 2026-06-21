@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, CloudRain, ShieldAlert, Heart, Laugh } from 'lucide-react';
+import { EmotionSystem, CompanionMoodType } from '../services/EmotionSystem';
+import { VoiceSystem } from '../services/VoiceSystem';
 
 interface CarbonTwinPetProps {
   score: number;
@@ -27,108 +29,18 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
   else defaultStateGroup = 'critical';
 
   // Determine standard companion mood if not specified
-  const effectiveMood = currentMood || (
-    score >= 85 ? 'excited' :
-    score >= 76 ? 'celebratory' :
-    score >= 65 ? 'proud' :
-    score >= 55 ? 'curious' :
-    score >= 45 ? 'playful' :
-    score >= 35 ? 'reflective' :
-    score >= 25 ? 'motivational' :
-    score >= 15 ? 'concerned' : 'sad'
-  );
+  const effectiveMood = (currentMood || EmotionSystem.getMoodFromScore(score)) as CompanionMoodType;
 
-  let stateGroup: 'excellent' | 'good' | 'moderate' | 'high' | 'critical' = 'good';
-  let bodyColor = '';
-  let cheekColor = '';
-  let moodText = '';
-  let description = '';
-  let bgGradient = '';
-  let faceAccent = '';
-
-  switch (effectiveMood) {
-    case 'excited':
-      stateGroup = 'excellent';
-      bodyColor = '#22c55e'; // Vibrant Green
-      cheekColor = '#f43f5e'; // Pastel pink cheeks
-      moodText = 'Radiant & Excited!';
-      description = `Your eco-actions are amazing! ${name} is blooming with high-energy excitement, surrounded by fresh oxygen!`;
-      bgGradient = 'from-emerald-300 via-green-100 to-emerald-400';
-      faceAccent = '#15803d';
-      break;
-    case 'celebratory':
-      stateGroup = 'excellent';
-      bodyColor = '#d97706'; // Golden orange
-      cheekColor = '#fb7185';
-      moodText = 'Celebratory Cheer!';
-      description = `Hooray! Streak milestone reached. ${name} is leaf-dancing and throwing a mini seed-shover celebration!`;
-      bgGradient = 'from-amber-200 via-yellow-100 to-amber-300';
-      faceAccent = '#78350f';
-      break;
-    case 'proud':
-      stateGroup = 'good';
-      bodyColor = '#10b981'; // Fresh Teal/Green
-      cheekColor = '#fda4af'; // Light pink
-      moodText = 'Thriving & Proud!';
-      description = `You've been showing up and keeping our footprint low. ${name} is feeling secure and proud!`;
-      bgGradient = 'from-green-100 via-teal-50 to-emerald-200';
-      faceAccent = '#115e59';
-      break;
-    case 'curious':
-      stateGroup = 'good';
-      bodyColor = '#06b6d4'; // Cyan
-      cheekColor = '#a5f3fc';
-      moodText = 'Inquisitive & Curious';
-      description = `Sprout is observing daily composting options! ${name} wants to know what other sustainable swaps can be made.`;
-      bgGradient = 'from-cyan-100 via-teal-50 to-cyan-200';
-      faceAccent = '#0e7490';
-      break;
-    case 'reflective':
-      stateGroup = 'moderate';
-      bodyColor = '#64748b'; // Slate Gray
-      cheekColor = '#cbd5e1';
-      moodText = 'Quietly Reflective';
-      description = `Evaluating historical footprint trends. Let's think deeply about how we can manage standby loads.`;
-      bgGradient = 'from-slate-100 via-stone-100 to-indigo-50';
-      faceAccent = '#334155';
-      break;
-    case 'concerned':
-      stateGroup = 'high';
-      bodyColor = '#f97316'; // Deep Orange
-      cheekColor = 'transparent'; // No cheeks
-      moodText = 'Slightly Concerned';
-      description = `Hmm... I noticed our emissions are creeping up a bit today. Nothing we can't tackle together!`;
-      bgGradient = 'from-orange-100 via-stone-200 to-amber-200';
-      faceAccent = '#7c2d12';
-      break;
-    case 'sad':
-      stateGroup = 'critical';
-      bodyColor = '#78716c'; // Sick Ash Stone Gray
-      cheekColor = 'transparent';
-      moodText = 'A Bit Sad & Worried';
-      description = `Emissions have increased a bit, making ${name} feel a little cloudy. Let's complete a Challenge and clear the air!`;
-      bgGradient = 'from-stone-400 via-neutral-300 to-zinc-500';
-      faceAccent = '#292524';
-      break;
-    case 'motivational':
-      stateGroup = 'moderate';
-      bodyColor = '#f59e0b'; // Warm Amber
-      cheekColor = '#fef08a'; // Faint yellow cheek tint
-      moodText = 'Start Fresh Today!';
-      description = `Progress is about small steps, not perfection. ${name} is here to support you at every single swap!`;
-      bgGradient = 'from-amber-50 via-yellow-100 to-amber-200';
-      faceAccent = '#b45309';
-      break;
-    case 'playful':
-      stateGroup = 'good';
-      bodyColor = '#14b8a6'; // Playful Teal
-      cheekColor = '#fca5a5';
-      moodText = 'Giggly & Playful';
-      description = `Reusing items brings so much joy! Let's explore creative, sustainable habits today.`;
-      bgGradient = 'from-orange-50 via-teal-100 to-amber-100';
-      faceAccent = '#0f766e';
-      break;
-  }
+  // Utilize the central EmotionSystem config
+  const {
+    stateGroup,
+    bodyColor,
+    cheekColor,
+    moodText,
+    description,
+    bgGradient,
+    faceAccent
+  } = EmotionSystem.getEmotionConfig(effectiveMood, name);
 
   // Accessories visuals
   const hasAccessory = (accName: string) => equippedAccessories.includes(accName);
@@ -155,74 +67,7 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
 
   // Cute procedural audio synthesis utilizing browser Web Audio APIs
   const playCuteSound = (type: string) => {
-    try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      const now = ctx.currentTime;
-      
-      if (type === 'giggle') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(400, now);
-        osc.frequency.exponentialRampToValueAtTime(820, now + 0.1);
-        osc.frequency.exponentialRampToValueAtTime(600, now + 0.18);
-        osc.frequency.exponentialRampToValueAtTime(960, now + 0.25);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
-        osc.start(now);
-        osc.stop(now + 0.3);
-      } else if (type === 'wink') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(580, now);
-        osc.frequency.exponentialRampToValueAtTime(1150, now + 0.12);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-        osc.start(now);
-        osc.stop(now + 0.18);
-      } else if (type === 'surprise') {
-        osc.type = 'sawtooth';
-        osc.frequency.setValueAtTime(260, now);
-        osc.frequency.exponentialRampToValueAtTime(950, now + 0.18);
-        gain.gain.setValueAtTime(0.05, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
-        osc.start(now);
-        osc.stop(now + 0.22);
-      } else if (type === 'love') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(320, now);
-        osc.frequency.exponentialRampToValueAtTime(460, now + 0.12);
-        gain.gain.setValueAtTime(0.15, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
-        osc.start(now);
-        osc.stop(now + 0.18);
-      } else if (type === 'hero') {
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(440, now);
-        osc.frequency.setValueAtTime(554, now + 0.08);
-        osc.frequency.setValueAtTime(659, now + 0.15);
-        osc.frequency.setValueAtTime(880, now + 0.25);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
-        osc.start(now);
-        osc.stop(now + 0.35);
-      } else if (type === 'sleepy') {
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(220, now);
-        osc.frequency.exponentialRampToValueAtTime(150, now + 0.5);
-        gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
-        osc.start(now);
-        osc.stop(now + 0.6);
-      }
-    } catch (err) {
-      console.warn('Audio Context interaction prevented or blocked:', err);
-    }
+    EmotionSystem.playProceduralSound(type);
   };
 
   // Get matching dialog phrases depending on stateGroup and tapped reaction
@@ -374,21 +219,14 @@ export default function CarbonTwinPet({ score, equippedAccessories, name, moodSt
     // Play custom synthesis audio pitch
     playCuteSound(reactionKind);
 
-    // Speak out dialog using Browser SpeechSynthesis with high pitched companion voice!
-    if ('speechSynthesis' in window) {
-      try {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(textPrompt);
-        utterance.pitch = 1.65; // Cute high pitched virtual companion
-        utterance.rate = 1.05; // Slightly fast cute pace
-        utterance.onstart = () => setIsLocalSpeaking(true);
-        utterance.onend = () => setIsLocalSpeaking(false);
-        utterance.onerror = () => setIsLocalSpeaking(false);
-        window.speechSynthesis.speak(utterance);
-      } catch (err) {
-        console.warn('SpeechSynthesis error:', err);
-      }
-    }
+    // Speak out dialog using Browser SpeechSynthesis via high level VoiceSystem!
+    VoiceSystem.speak(textPrompt, {
+      pitch: 1.65, // Cute high pitched virtual companion
+      rate: 1.05,  // Slightly fast cute pace
+      onStart: () => setIsLocalSpeaking(true),
+      onEnd: () => setIsLocalSpeaking(false),
+      onError: () => setIsLocalSpeaking(false)
+    });
     
     // Spawn playful floating particles with offset
     const newParticles = Array.from({ length: 5 }).map((_, idx) => ({

@@ -42,6 +42,12 @@ export const CARBON_MULTIPLIERS = {
   },
 };
 
+/**
+ * @class CarbonEngine
+ * @description Core computation service for evaluating user carbon emissions,
+ * mapping behaviors into enterprise sustainability metrics, and converting raw kg CO2 values
+ * into tangible real-world environmental equivalents.
+ */
 export class CarbonEngine {
   public static readonly MULTIPLIERS = CARBON_MULTIPLIERS;
 

@@ -17,6 +17,16 @@ interface ActionPlannerProps {
   onRefreshProfile?: () => void;
 }
 
+/**
+ * @component ActionPlanner
+ * @description Renders a comprehensive, interactive 7-day carbon reduction program.
+ * Empowers users to complete tactical eco-habits daily and simulate their cumulative 
+ * long-term annual carbon reduction.
+ * 
+ * @param {ActionPlannerProps} props Component props
+ * @param {string} props.userId Active user unique identifier
+ * @param {() => void} [props.onRefreshProfile] Optional callback to sync stats across other tabs
+ */
 export default function ActionPlanner({ userId, onRefreshProfile }: ActionPlannerProps) {
   const [actionPlan, setActionPlan] = useState<ActionPlan | null>(null);
   const [selectedDay, setSelectedDay] = useState<number>(1);

@@ -10,6 +10,12 @@ export interface WeeklyReportData {
   futureProjections: string;
 }
 
+/**
+ * @class ReportGenerator
+ * @description Compiles historical logging entries and current footprint baselines 
+ * to assemble strategic, highly detailed weekly analytical reports, performance grades, 
+ * trends, and future carbon savings projections.
+ */
 export class ReportGenerator {
   /**
    * Compiles and grades historical carbon logs to assemble a strategic weekly summary.

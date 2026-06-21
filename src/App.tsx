@@ -4,7 +4,6 @@ import Onboarding from './components/Onboarding';
 import Dashboard from './components/Dashboard';
 import ActionPlanner from './components/ActionPlanner';
 import CarbonTwinPet from './components/CarbonTwinPet';
-import AICoach from './components/AICoach';
 import Scanner from './components/Scanner';
 import Challenges from './components/Challenges';
 import ProfileAchievements from './components/ProfileAchievements';
@@ -30,7 +29,8 @@ import {
   sendEmailVerification,
   sendPasswordResetEmail,
   signInAnonymously,
-  updateProfile
+  updateProfile,
+  User
 } from 'firebase/auth';
 import { auth } from './lib/firebase';
 
@@ -40,7 +40,7 @@ export default function App() {
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [isAuthInitLoading, setIsAuthInitLoading] = useState(true);
   const [isWaitingVerification, setIsWaitingVerification] = useState(false);
-  const [verifiedUserPlaceholder, setVerifiedUserPlaceholder] = useState<any>(null);
+  const [verifiedUserPlaceholder, setVerifiedUserPlaceholder] = useState<User | null>(null);
 
   // Sign up inputs
   const [signupName, setSignupName] = useState('');
@@ -632,7 +632,7 @@ export default function App() {
   };
 
   // Callback to refresh profile stats live
-  const reloadProfileStats = (updatedUser?: any) => {
+  const reloadProfileStats = (updatedUser?: UserProfile) => {
     if (updatedUser) {
       setProfile(updatedUser);
     } else if (currentUser) {
@@ -662,7 +662,7 @@ export default function App() {
   };
 
   // Custom log additions proxy
-  const handleLogAction = async (category: any, activity: string, co2: number, xp: number) => {
+  const handleLogAction = async (category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste' | 'general', activity: string, co2: number, xp: number) => {
     if (!currentUser) return;
     try {
       const response = await fetch('/api/entries', {

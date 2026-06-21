@@ -8,6 +8,12 @@ export interface EcosystemPulseState {
   pulseStatus: 'stable' | 'vibrant' | 'needs-attention';
 }
 
+/**
+ * @class PlanetPulseEcosystem
+ * @description Real-time ecosystem state management and status engine.
+ * Computes online connectivity states, active habits logging streaks, companion visual
+ * scale scaling multipliers, and overall environment status.
+ */
 export class PlanetPulseEcosystem {
   /**
    * Evaluates the local ecosystem health and connectivity status.

@@ -1,4 +1,5 @@
-import { TransType, DietType, CarbonStats, LoggedEntry } from './carbon';
+import { TransType, DietType, CarbonStats, LoggedEntry, OnboardingData } from './carbon';
+import { UserChallengeState } from './challenges';
 
 export interface CompanionState {
   name: string;
@@ -55,9 +56,9 @@ export interface UserProfile {
   email: string;
   name: string;
   onboarded: boolean;
-  onboarding: any; // OnboardingData
+  onboarding: OnboardingData;
   companion: CompanionState;
-  challenges: any[];
+  challenges: UserChallengeState[];
   logs: LoggedEntry[];
   stats: CarbonStats;
   conversations?: ConversationLog[];

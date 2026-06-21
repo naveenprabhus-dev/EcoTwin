@@ -9,6 +9,15 @@ interface PlanetPulseEcosystemViewProps {
   score: number;
 }
 
+/**
+ * @component PlanetPulseEcosystemView
+ * @description Dynamic structural visualization of the virtual planet's biosphere state.
+ * Transitions through multiple visual stages (Crisis, Recovery, Thriving, Planet Guardian)
+ * based on the user's active sustainability score.
+ * 
+ * @param {PlanetPulseEcosystemViewProps} props Component props
+ * @param {number} props.score Visual status/carbon score determining the active ecosystem biome
+ */
 export default function PlanetPulseEcosystemView({ score }: PlanetPulseEcosystemViewProps) {
   // Determine active state index based on the 4 ecosystem thresholds
   // 1. Crisis: score < 40

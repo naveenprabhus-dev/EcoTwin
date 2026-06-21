@@ -1,5 +1,11 @@
 import { UserProfile } from '../types';
 
+/**
+ * @class EcoBuddyAssistant
+ * @description Custom LLM coaching helper service that builds personalized greetings for the 
+ * virtual Carbon Companion, suggests high-impact environmental queries, and returns stable
+ * fallback explanations during connectivity errors.
+ */
 export class EcoBuddyAssistant {
   /**
    * List of sample questions for users to get quick Coaching tips.

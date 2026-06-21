@@ -9,6 +9,8 @@ import {
   Footprints, Zap, Sandwich, ShoppingBag, Trash2, HelpCircle
 } from 'lucide-react';
 import { UserProfile, ActionPlan, ActionPlanTask } from '../types';
+import { EcoBuddyService } from '../services/ecoBuddyService';
+import { CarbonEngine } from '../services/CarbonEngine';
 
 interface ActionPlannerProps {
   userId: string;
@@ -24,11 +26,14 @@ export default function ActionPlanner({ userId, onRefreshProfile }: ActionPlanne
   const [reflectionText, setReflectionText] = useState<string | null>(null);
   const [isReflecting, setIsReflecting] = useState<boolean>(false);
   const [showReflectionModal, setShowReflectionModal] = useState<boolean>(false);
+  const [annualAverage, setAnnualAverage] = useState<number>(5.2);
+  const [profile, setProfile] = useState<any>(null);
 
   // Fetch plan on mount or userId change
   const fetchActionPlan = async () => {
     setIsLoading(true);
     try {
+      // Fetch action plan
       const res = await fetch(`/api/action-planner?userId=${userId}`);
       const data = await res.json();
       if (data.success && data.actionPlan) {
@@ -39,6 +44,16 @@ export default function ActionPlanner({ userId, onRefreshProfile }: ActionPlanne
           setSelectedDay(firstIncomplete.day);
         } else {
           setSelectedDay(1);
+        }
+      }
+
+      // Fetch profile statistics dynamically for annual metrics
+      const profileRes = await fetch(`/api/profile?userId=${userId}`);
+      const profileData = await profileRes.json();
+      if (profileData.success && profileData.profile) {
+        setProfile(profileData.profile);
+        if (profileData.profile.stats) {
+          setAnnualAverage(profileData.profile.stats.annualAverage || 5.2);
         }
       }
     } catch (e) {
@@ -281,6 +296,15 @@ export default function ActionPlanner({ userId, onRefreshProfile }: ActionPlanne
                   <p className="text-xs text-slate-600 leading-relaxed mt-1 font-semibold">
                     {selectedTask.description}
                   </p>
+
+                  {/* EcoBuddy Selected reason description */}
+                  <div className="bg-art-pale/40 border border-art-border rounded-xl p-3.5 mt-3 flex items-start gap-2 text-[11px] text-art-dark font-sans leading-relaxed font-semibold">
+                    <span className="text-sm">🦖</span>
+                    <div>
+                      <span className="text-[10px] font-black text-art-olive uppercase tracking-wider block mb-0.5">EcoBuddy Selection reason:</span>
+                      {EcoBuddyService.getSelectionExplanation(selectedTask, profile || { onboarding: {} } as any)}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Metrics Stats Group */}
@@ -388,14 +412,29 @@ export default function ActionPlanner({ userId, onRefreshProfile }: ActionPlanne
             </div>
           </div>
 
-          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl">
-            <span className="text-[10px] font-black tracking-wider text-emerald-800 uppercase block">1-Year Savings Projection:</span>
-            <span className="text-2xl font-extrabold text-emerald-950 block mt-1">
-              -{Math.round(totalReduction * 52 * (sliderCompliance / 100))} kg CO₂
-            </span>
-            <p className="text-[10px] font-semibold text-emerald-700 mt-1 leading-relaxed">
-              Equates directly to planting approximately <span className="font-bold underline">{Math.round((totalReduction * 52 * (sliderCompliance / 100)) / 22)}</span> deciduous trees worth of carbon capture! Keep leveling up.
-            </p>
+          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl space-y-3">
+            <div>
+              <span className="text-[10px] font-black tracking-wider text-emerald-800 uppercase block">1-Year Savings Projection:</span>
+              <span className="text-2xl font-extrabold text-emerald-950 block mt-1">
+                -{Math.round(totalReduction * 52 * (sliderCompliance / 100))} kg CO₂
+              </span>
+              <p className="text-[10px] font-semibold text-emerald-700 mt-1 leading-relaxed">
+                Equates directly to planting approximately <span className="font-bold underline">{Math.round((totalReduction * 52 * (sliderCompliance / 100)) / 22)}</span> deciduous trees worth of carbon capture! Keep leveling up.
+              </p>
+            </div>
+
+            <div className="pt-2 border-t border-emerald-200/50 grid grid-cols-2 gap-2 text-left">
+              <div>
+                <span className="text-[9px] font-bold text-slate-400 uppercase block">Current Annual Footprint</span>
+                <span className="text-xs font-mono font-bold text-slate-800">{annualAverage.toFixed(1)} t CO₂/yr</span>
+              </div>
+              <div>
+                <span className="text-[9px] font-bold text-emerald-800 uppercase block">Predicted Annual Footprint</span>
+                <span className="text-xs font-mono font-bold text-emerald-700">
+                  {Math.max(0.1, annualAverage - (totalReduction * 52 / 1000) * (sliderCompliance / 100)).toFixed(2)} t CO₂/yr
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

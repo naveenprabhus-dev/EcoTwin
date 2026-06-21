@@ -137,3 +137,16 @@ export interface UserProfile {
   sustainability_scores?: SustainabilityScoreLog[];
   actionPlan?: ActionPlan;
 }
+
+export interface Goal {
+  id: string;
+  title: string;
+  targetDate: string;
+  completed: boolean;
+  category: 'transport' | 'energy' | 'food' | 'shopping' | 'waste';
+  targetValue: number;
+  currentValue: number;
+  unit: string;
+  buddyFeedback?: string;
+}
+

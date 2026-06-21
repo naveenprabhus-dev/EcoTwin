@@ -10,6 +10,8 @@ import Challenges from './components/Challenges';
 import ProfileAchievements from './components/ProfileAchievements';
 import FutureSimulator from './components/FutureSimulator';
 import WeeklyReport from './components/WeeklyReport';
+import PlanetPulseEcosystemView from './components/PlanetPulseEcosystemView';
+import UnifiedEcoBuddyAssistant from './components/UnifiedEcoBuddyAssistant';
 import { 
   Trees, Bot, Shield, Sparkles, LogOut, 
   Leaf, Trophy, Settings, Activity, Cpu, Scan, 
@@ -1293,75 +1295,9 @@ export default function App() {
                       </div>
                     </div>
 
-                    {/* Right: Companion states details panel list */}
-                    <div className="lg:col-span-5 bg-white rounded-3xl p-6 border border-slate-100 shadow-md space-y-4">
-                      <div>
-                        <h4 className="font-display font-bold text-slate-900 text-sm flex items-center gap-1.5">
-                          <Activity className="w-4 h-4 text-emerald-600" /> State Evolution Guidelines
-                        </h4>
-                        <p className="text-xs text-slate-500 leading-normal mt-0.5">
-                          Your visual pet progresses dynamically through multiple emotional stages depending on carbon rating achievements.
-                        </p>
-                      </div>
-
-                      <div className="space-y-2 pt-2 text-xs">
-                        
-                        <div className="p-3 bg-emerald-50 border border-emerald-100 rounded-xl flex items-center justify-between">
-                          <div className="flex gap-2">
-                            <span className="text-lg">🌿</span>
-                            <div>
-                              <span className="font-bold text-emerald-950 block">Excellent (Score 80-100)</span>
-                              <span className="text-[10px] text-emerald-800 font-sans block font-medium">Bright green body, smiling facial expression, lush foliage</span>
-                            </div>
-                          </div>
-                          {profile.stats.score >= 80 && <span className="font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded text-[10px]">Active</span>}
-                        </div>
-
-                        <div className="p-3 bg-teal-50/60 border border-teal-100/60 rounded-xl flex items-center justify-between">
-                          <div className="flex gap-2">
-                            <span className="text-lg">🌱</span>
-                            <div>
-                              <span className="font-bold text-teal-950 block">Good (Score 60-79)</span>
-                              <span className="text-[10px] text-teal-800 font-sans block font-medium">Content face expression, healthy standard surroundings</span>
-                            </div>
-                          </div>
-                          {(profile.stats.score >= 60 && profile.stats.score < 80) && <span className="font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded text-[10px]">Active</span>}
-                        </div>
-
-                        <div className="p-3 bg-amber-50/60 border border-amber-100/60 rounded-xl flex items-center justify-between">
-                          <div className="flex gap-2">
-                            <span className="text-lg">🍂</span>
-                            <div>
-                              <span className="font-bold text-amber-950 block">Moderate (Score 40-59)</span>
-                              <span className="text-[10px] text-amber-800 font-sans block font-medium">Slightly concerned look, straight mouth, warning leaves</span>
-                            </div>
-                          </div>
-                          {(profile.stats.score >= 40 && profile.stats.score < 60) && <span className="font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded text-[10px]">Active</span>}
-                        </div>
-
-                        <div className="p-3 bg-orange-50/60 border border-orange-100/60 rounded-xl flex items-center justify-between">
-                          <div className="flex gap-2">
-                            <span className="text-lg">💨</span>
-                            <div>
-                              <span className="font-bold text-orange-950 block">High Carbon Impact (Score 20-39)</span>
-                              <span className="text-[10px] text-orange-850 font-sans block font-medium">Sad crying expression, orange warning themes, dry foliage</span>
-                            </div>
-                          </div>
-                          {(profile.stats.score >= 20 && profile.stats.score < 40) && <span className="font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded text-[10px]">Active</span>}
-                        </div>
-
-                        <div className="p-3 bg-stone-100 border border-stone-200 rounded-xl flex items-center justify-between">
-                          <div className="flex gap-2">
-                            <span className="text-lg">☣️</span>
-                            <div>
-                              <span className="font-bold text-stone-900 block">Critical (Score 0-19)</span>
-                              <span className="text-[10px] text-stone-600 font-sans block font-medium">Ash grey coughing face details, dead plants, carbon smog effects</span>
-                            </div>
-                          </div>
-                          {profile.stats.score < 20 && <span className="font-bold text-zinc-700 bg-zinc-200 px-2 py-0.5 rounded text-[10px]">Active</span>}
-                        </div>
-
-                      </div>
+                    {/* Right: Planet Pulse Ecosystem living component */}
+                    <div className="lg:col-span-5">
+                      <PlanetPulseEcosystemView score={profile.stats.score} />
                     </div>
 
                   </div>
@@ -1385,12 +1321,15 @@ export default function App() {
                   />
                 )}
 
-                {/* C. AI SUSTAINABILITY COACH */}
+                {/* C. 🌱 ECOBUDDY ASSISTANT */}
                 {activeTab === 'coach' && (
-                  <AICoach 
+                  <UnifiedEcoBuddyAssistant 
                     userId={profile.userId}
                     companionName={profile.companion.name}
                     score={profile.stats.score}
+                    profile={profile}
+                    onAddCustomEntry={handleLogAction}
+                    onRefreshProfile={() => fetchProfile(profile.userId)}
                   />
                 )}
 

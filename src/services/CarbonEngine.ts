@@ -46,6 +46,76 @@ export class CarbonEngine {
   public static readonly MULTIPLIERS = CARBON_MULTIPLIERS;
 
   /**
+   * Translates absolute CO2 savings in kg into highly descriptive, tangible equivalents.
+   * Fulfills Phase 4 guidelines.
+   */
+  public static getRealWorldEquivalents(co2Kg: number) {
+    const absCo2 = Math.abs(co2Kg);
+    
+    // 1 Tree absorbs roughly 22kg CO2 per year (0.06 kg per day)
+    // So 1 kg CO2 saved is equivalent to 1 tree absorbing carbon for ~16.5 days.
+    const treeDays = Number((absCo2 * 16.5).toFixed(1));
+    
+    // Average gasoline car emits roughly 0.24 kg CO2 per kilometer.
+    // So 1 kg CO2 saved is equivalent to avoiding ~4.1 km of passenger car driving.
+    const drivingKm = Number((absCo2 * 4.1).toFixed(1));
+    
+    // Standard LED bulb uses ~10W. Generating 1 kWh grid electricity emits ~0.4 kg CO2.
+    // So 1 kg CO2 saved avoids ~2.5 kWh, which can power a 10W LED bulb for 250 hours!
+    const ledHours = Number((absCo2 * 250).toFixed(0));
+
+    // Laptop charges (~0.05 kWh per charge)
+    const laptopCharges = Number((absCo2 * 50).toFixed(0));
+
+    return {
+      treeDays,
+      drivingKm,
+      ledHours,
+      laptopCharges,
+    };
+  }
+
+  /**
+   * Answers "Why did this happen?" and "What should I do next?" for carbon sectors.
+   * Fulfills Phase 4 chart/metric guidelines.
+   */
+  public static getSectorContext(category: string, value: number) {
+    switch (category) {
+      case 'transport':
+        return {
+          why: "Transportation emissions directly result from burning fossil fuels in petrol/diesel engines during single-passenger commutes.",
+          next: "Prefer public networks, bicycle swaps for sub-5km routes, or organize a weekly carpool with EcoBuddy buddies."
+        };
+      case 'energy':
+      case 'electricity':
+        return {
+          why: "Electricity footprints emerge from thermal power plants supplying local municipal grids. Standby appliances run 'vampire' currents.",
+          next: "Unplug idle screen chargers, switch to LED appliances, or lower your air cooling threshold down to 24-25°C."
+        };
+      case 'food':
+        return {
+          why: "High livestock farming footprints arise from heavy agricultural water use, soil degradation, and enteric methane emissions.",
+          next: "Shift your plate ratio by replacing red beef dishes with poultry, egg, or delicious companion veggie swaps once a week."
+        };
+      case 'shopping':
+        return {
+          why: "New manufactured wares generate extreme upstream supply chain processing, ocean shipping, and microplastic dye pollution.",
+          next: "Thrift vintage garments, repair broken accessories inside the Virtual Twin, or purchase only durable circular items."
+        };
+      case 'waste':
+        return {
+          why: "Muddled waste landfills rot anaerobically, generating massive noxious methane gas and carbon leaks directly into the wind.",
+          next: "Segregate organic scraps for backyard composting, and implement full clean recycling habits across paper and pet plastic."
+        };
+      default:
+        return {
+          why: "General consumption habits determine the velocity of individual carbon footprint emissions.",
+          next: "Audit your carbon dashboard daily, completing adaptive habits to feed Sprout and level up your status."
+        };
+    }
+  }
+
+  /**
    * Calculates user carbon footprints and overall ecology health metrics
    * based on provided high-level onboarding questions.
    * 

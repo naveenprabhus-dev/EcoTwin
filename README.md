@@ -246,19 +246,24 @@ Implemented:
 
 ### Dashboard
 
-![Dashboard](docs/screenshots/dashboard.png)
+<img width="1918" height="1092" alt="image" src="https://github.com/user-attachments/assets/a3b1e192-e29f-45f4-8f49-d52bffcf20eb" />
+
 
 ### EcoBuddy Assistant
 
-![EcoBuddy](docs/screenshots/ecobuddy.png)
+<img width="532" height="817" alt="image" src="https://github.com/user-attachments/assets/28f4397a-75fc-4ff1-ac98-664c77190a1a" />
+<img width="1918" height="978" alt="image" src="https://github.com/user-attachments/assets/e3859357-17e2-40e8-b809-636d06e22958" />
 
-### Planet Pulse Ecosystem
 
-![Planet Pulse](docs/screenshots/planetpulse.png)
+### carbon footprint simulator
 
-### Action Planner
+<img width="1917" height="1086" alt="image" src="https://github.com/user-attachments/assets/42d4d582-8b6f-497c-bd74-46acc628063d" />
 
-![Action Planner](docs/screenshots/actionplanner.png)
+
+### weekly report
+
+<img width="1912" height="1093" alt="image" src="https://github.com/user-attachments/assets/fdd8341b-6318-48e2-9321-52b6dd262c75" />
+
 
 ---
 

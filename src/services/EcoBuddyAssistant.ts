@@ -7,6 +7,29 @@ import { UserProfile } from '../types';
  * fallback explanations during connectivity errors.
  */
 export class EcoBuddyAssistant {
+  private static responseCache = new Map<string, string>();
+
+  /**
+   * Retrieves a cached reply for similar questions if available, ensuring instant response.
+   */
+  public static getCachedResponse(question: string): string | undefined {
+    const key = (question || '').trim().toLowerCase();
+    return this.responseCache.get(key);
+  }
+
+  /**
+   * Stores a generated assistant reply inside our fast-lookup cache.
+   */
+  public static cacheResponse(question: string, reply: string): void {
+    const key = (question || '').trim().toLowerCase();
+    // Prevent unbounded memory growth
+    if (this.responseCache.size > 100) {
+      const firstKey = this.responseCache.keys().next().value;
+      if (firstKey !== undefined) this.responseCache.delete(firstKey);
+    }
+    this.responseCache.set(key, reply);
+  }
+
   /**
    * List of sample questions for users to get quick Coaching tips.
    */

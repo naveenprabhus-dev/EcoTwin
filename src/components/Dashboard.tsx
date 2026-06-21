@@ -12,6 +12,8 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { CarbonEngine } from '../services/CarbonEngine';
+import { Logger } from '../shared/utils/logger';
+import { ErrorTracker } from '../shared/utils/errorTracker';
 
 interface DashboardProps {
   stats: CarbonStats;
@@ -35,7 +37,8 @@ export default function Dashboard({ stats, logs, onAddCustomEntry, userId }: Das
           setActionPlan(data.actionPlan);
         }
       } catch (e) {
-        console.error("Dashboard failed to fetch action plan:", e);
+        Logger.error("Dashboard failed to fetch action plan", "DASHBOARD", { error: e });
+        ErrorTracker.capture(e, "DASHBOARD_FETCH");
       }
     };
     fetchPlanData();
